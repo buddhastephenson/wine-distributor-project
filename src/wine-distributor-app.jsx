@@ -118,52 +118,6 @@ const WineDistributorApp = () => {
     setCart([]);
   };
 
-  const parseExcelFile = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-
-          // Parse the data - looking for common column headers
-          const headers = jsonData[0].map(h => String(h).toLowerCase().trim());
-          const parsedProducts = [];
-
-          for (let i = 1; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            if (!row || row.length === 0) continue;
-
-            const product = {
-              id: `prod-${Date.now()}-${i}`,
-              itemCode: findValue(row, headers, ['item code', 'sku', 'code', 'item']),
-              producer: findValue(row, headers, ['producer', 'winery', 'brand', 'manufacturer']),
-              productName: findValue(row, headers, ['product', 'name', 'wine', 'description']),
-              vintage: findValue(row, headers, ['vintage', 'year']),
-              packSize: findValue(row, headers, ['pack', 'pack size', 'case size']),
-              bottleSize: findValue(row, headers, ['bottle', 'bottle size', 'size', 'ml']),
-              productType: findValue(row, headers, ['type', 'category', 'product type']),
-              fobCasePrice: parseFloat(findValue(row, headers, ['fob', 'price', 'case price', 'cost'])) || 0,
-              supplier: file.name.split('.')[0],
-              uploadDate: new Date().toISOString()
-            };
-
-            if (product.producer || product.productName) {
-              parsedProducts.push(product);
-            }
-          }
-
-          resolve(parsedProducts);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-  };
 
   const findValue = (row, headers, possibleNames) => {
     for (const name of possibleNames) {
