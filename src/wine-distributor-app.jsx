@@ -119,15 +119,6 @@ const WineDistributorApp = () => {
   };
 
 
-  const findValue = (row, headers, possibleNames) => {
-    for (const name of possibleNames) {
-      const index = headers.findIndex(h => h.includes(name));
-      if (index !== -1 && row[index] !== undefined && row[index] !== null && row[index] !== '') {
-        return String(row[index]).trim();
-      }
-    }
-    return '';
-  };
 
   const calculateFrontlinePrice = (product) => {
     const productType = product.productType.toLowerCase();
