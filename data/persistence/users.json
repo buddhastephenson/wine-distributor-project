@@ -28,5 +28,17 @@
     "username": "adminuser999adminuser777adminuser777",
     "password": "adminpassword999adminpassword777admadminpassword777inpassword777",
     "type": "admin"
+  },
+  {
+    "id": "user-1769618035175",
+    "username": "admin_test",
+    "password": "password",
+    "type": "customer"
+  },
+  {
+    "id": "user-1769618119882",
+    "username": "admin_testtest_admin_verified",
+    "password": "password",
+    "type": "admin"
   }
 ]

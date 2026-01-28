@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings } from 'lucide-react';
+import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const WineDistributorApp = () => {
@@ -41,6 +41,22 @@ const WineDistributorApp = () => {
   const [pendingUpload, setPendingUpload] = useState(null);
   const [columnMapping, setColumnMapping] = useState(null);
   const [mappingTemplates, setMappingTemplates] = useState({});
+  const [collapsedSections, setCollapsedSections] = useState({
+    catalog: false,
+    orders: false,
+    discontinued: false,
+    formulas: false,
+    suppliers: false,
+    upload: false,
+    dressner: false
+  });
+
+  const toggleSection = (section) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   // Auth State
   const [authMode, setAuthMode] = useState('login');
@@ -804,527 +820,608 @@ const WineDistributorApp = () => {
 
           {/* Product Catalog - Admin View with Pricing */}
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <Package className="w-6 h-6 mr-2 text-rose-600" />
-                Product Catalog (Admin View)
-              </h2>
-
-              <div className="relative w-full md:w-96">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search products..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all"
-                />
+            <div
+              className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('catalog')}
+            >
+              <div className="flex items-center">
+                {collapsedSections.catalog ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+                <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                  <Package className="w-6 h-6 mr-2 text-rose-600" />
+                  Product Catalog (Admin View)
+                </h2>
               </div>
+
+              {!collapsedSections.catalog && (
+                <div className="relative w-full md:w-96" onClick={(e) => e.stopPropagation()}>
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search products..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all"
+                  />
+                </div>
+              )}
             </div>
 
-            {filteredProducts.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">
-                {products.length === 0 ? 'No products in catalog' : 'No products match your search'}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 border-b-2 border-slate-200">
-                    <tr>
-                      <th className="text-left p-3 font-semibold text-slate-700">Code</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Producer</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Product</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Vintage</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Size</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Pack</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Type</th>
-                      <th className="text-right p-3 font-semibold text-slate-700">FOB Case</th>
-                      <th className="text-right p-3 font-semibold text-slate-700">Frontline Btl</th>
-                      <th className="text-right p-3 font-semibold text-slate-700">Frontline Case</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Supplier</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProducts.map((product, idx) => {
-                      const calc = calculateFrontlinePrice(product);
-                      const frontlineCase = (parseFloat(calc.frontlinePrice) * parseInt(product.packSize || 12)).toFixed(2);
+            {!collapsedSections.catalog && (
+              <>
 
-                      return (
-                        <tr key={product.id} className={`border-b border-slate-100 hover:bg-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                          <td className="p-3 text-slate-500 font-mono text-xs">{product.itemCode}</td>
-                          <td className="p-3 text-slate-800">{product.producer}</td>
-                          <td className="p-3 text-slate-700">{product.productName}</td>
-                          <td className="p-3 text-slate-600">{product.vintage || 'NV'}</td>
-                          <td className="p-3 text-slate-600">{product.bottleSize}</td>
-                          <td className="p-3 text-slate-600">{product.packSize}</td>
-                          <td className="p-3">
-                            <span className={`text-xs px-2 py-1 rounded ${calc.formulaUsed === 'wine' ? 'bg-purple-100 text-purple-700' :
-                              calc.formulaUsed === 'spirits' ? 'bg-amber-100 text-amber-700' :
-                                'bg-blue-100 text-blue-700'
-                              }`}>
-                              {calc.formulaUsed}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right font-semibold text-slate-800">${product.fobCasePrice.toFixed(2)}</td>
-                          <td className="p-3 text-right font-semibold text-rose-600">${calc.frontlinePrice}</td>
-                          <td className="p-3 text-right font-bold text-rose-700">${frontlineCase}</td>
-                          <td className="p-3 text-slate-500 text-xs">{product.supplier}</td>
+                {filteredProducts.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">
+                    {products.length === 0 ? 'No products in catalog' : 'No products match your search'}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 border-b-2 border-slate-200">
+                        <tr>
+                          <th className="text-left p-3 font-semibold text-slate-700">Code</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Producer</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Product</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Vintage</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Size</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Pack</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Type</th>
+                          <th className="text-right p-3 font-semibold text-slate-700">FOB Case</th>
+                          <th className="text-right p-3 font-semibold text-slate-700">Frontline Btl</th>
+                          <th className="text-right p-3 font-semibold text-slate-700">Frontline Case</th>
+                          <th className="text-left p-3 font-semibold text-slate-700">Supplier</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {filteredProducts.map((product, idx) => {
+                          const calc = calculateFrontlinePrice(product);
+                          const frontlineCase = (parseFloat(calc.frontlinePrice) * parseInt(product.packSize || 12)).toFixed(2);
+
+                          return (
+                            <tr key={product.id} className={`border-b border-slate-100 hover:bg-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                              <td className="p-3 text-slate-500 font-mono text-xs">{product.itemCode}</td>
+                              <td className="p-3 text-slate-800">{product.producer}</td>
+                              <td className="p-3 text-slate-700">{product.productName}</td>
+                              <td className="p-3 text-slate-600">{product.vintage || 'NV'}</td>
+                              <td className="p-3 text-slate-600">{product.bottleSize}</td>
+                              <td className="p-3 text-slate-600">{product.packSize}</td>
+                              <td className="p-3">
+                                <span className={`text-xs px-2 py-1 rounded ${calc.formulaUsed === 'wine' ? 'bg-purple-100 text-purple-700' :
+                                  calc.formulaUsed === 'spirits' ? 'bg-amber-100 text-amber-700' :
+                                    'bg-blue-100 text-blue-700'
+                                  }`}>
+                                  {calc.formulaUsed}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right font-semibold text-slate-800">${product.fobCasePrice.toFixed(2)}</td>
+                              <td className="p-3 text-right font-semibold text-rose-600">${calc.frontlinePrice}</td>
+                              <td className="p-3 text-right font-bold text-rose-700">${frontlineCase}</td>
+                              <td className="p-3 text-slate-500 text-xs">{product.supplier}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Recent Orders */}
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-              <ShoppingCart className="w-6 h-6 mr-2 text-rose-600" />
-              Recent Orders
-            </h2>
+            <div
+              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('orders')}
+            >
+              {collapsedSections.orders ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+              <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <ShoppingCart className="w-6 h-6 mr-2 text-rose-600" />
+                Recent Orders
+              </h2>
+            </div>
 
-            {orders.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No orders yet</p>
-            ) : (
-              <div className="space-y-4">
-                {orders.slice().reverse().map(order => {
-                  // Check if any items are discontinued
-                  const hasDiscontinued = order.items.some(item =>
-                    discontinuedProducts.find(d => d.id === item.id)
-                  );
+            {!collapsedSections.orders && (
+              <>
 
-                  return (
-                    <div key={order.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="font-semibold text-slate-800">{order.customer}</p>
-                          <p className="text-sm text-slate-500">{new Date(order.date).toLocaleDateString()}</p>
-                          {hasDiscontinued && (
-                            <p className="text-xs text-amber-600 mt-1">⚠ Contains discontinued items</p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-rose-600">${order.total}</p>
-                          <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                            {order.status}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-sm text-slate-600">
-                        {order.items.length} item(s)
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700">View items</summary>
-                          <div className="mt-2 space-y-1">
-                            {order.items.map((item, idx) => {
-                              const isDiscontinued = discontinuedProducts.find(d => d.id === item.id);
-                              return (
-                                <div key={idx} className={`text-xs pl-2 ${isDiscontinued ? 'text-amber-700' : 'text-slate-600'}`}>
-                                  {isDiscontinued && '⚠ '}{item.producer} - {item.productName} (×{item.quantity})
-                                </div>
-                              );
-                            })}
+                {orders.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">No orders yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.slice().reverse().map(order => {
+                      // Check if any items are discontinued
+                      const hasDiscontinued = order.items.some(item =>
+                        discontinuedProducts.find(d => d.id === item.id)
+                      );
+
+                      return (
+                        <div key={order.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <p className="font-semibold text-slate-800">{order.customer}</p>
+                              <p className="text-sm text-slate-500">{new Date(order.date).toLocaleDateString()}</p>
+                              {hasDiscontinued && (
+                                <p className="text-xs text-amber-600 mt-1">⚠ Contains discontinued items</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-rose-600">${order.total}</p>
+                              <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                {order.status}
+                              </span>
+                            </div>
                           </div>
-                        </details>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                          <div className="text-sm text-slate-600">
+                            {order.items.length} item(s)
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700">View items</summary>
+                              <div className="mt-2 space-y-1">
+                                {order.items.map((item, idx) => {
+                                  const isDiscontinued = discontinuedProducts.find(d => d.id === item.id);
+                                  return (
+                                    <div key={idx} className={`text-xs pl-2 ${isDiscontinued ? 'text-amber-700' : 'text-slate-600'}`}>
+                                      {isDiscontinued && '⚠ '}{item.producer} - {item.productName} (×{item.quantity})
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </details>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Discontinued Products (In Active Orders) */}
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-              <Package className="w-6 h-6 mr-2 text-rose-600" />
-              Discontinued Products (In Active Orders)
-            </h2>
+            <div
+              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('discontinued')}
+            >
+              {collapsedSections.discontinued ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+              <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <Package className="w-6 h-6 mr-2 text-rose-600" />
+                Discontinued Products (In Active Orders)
+              </h2>
+            </div>
 
-            {discontinuedProducts.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No discontinued products with active orders</p>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {discontinuedProducts.map(product => (
-                  <div key={product.id} className="border border-amber-200 bg-amber-50 rounded-lg p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-slate-800">{product.producer} - {product.productName}</p>
-                        <p className="text-sm text-slate-600">{product.vintage || 'NV'} | {product.bottleSize} | {product.supplier}</p>
-                        <p className="text-xs text-amber-700 mt-1">
-                          Discontinued: {new Date(product.discontinuedDate).toLocaleDateString()}
-                        </p>
+            {!collapsedSections.discontinued && (
+              <>
+
+                {discontinuedProducts.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">No discontinued products with active orders</p>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {discontinuedProducts.map(product => (
+                      <div key={product.id} className="border border-amber-200 bg-amber-50 rounded-lg p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-slate-800">{product.producer} - {product.productName}</p>
+                            <p className="text-sm text-slate-600">{product.vintage || 'NV'} | {product.bottleSize} | {product.supplier}</p>
+                            <p className="text-xs text-amber-700 mt-1">
+                              Discontinued: {new Date(product.discontinuedDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-slate-700">${product.frontlinePrice}</p>
+                            <p className="text-xs text-slate-500">per bottle</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-slate-700">${product.frontlinePrice}</p>
-                        <p className="text-xs text-slate-500">per bottle</p>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Pricing Formulas (AOC) */}
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-              <Settings className="w-6 h-6 mr-2 text-rose-600" />
-              Pricing Formulas (AOC)
-            </h2>
+            <div
+              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('formulas')}
+            >
+              {collapsedSections.formulas ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+              <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <Settings className="w-6 h-6 mr-2 text-rose-600" />
+                Pricing Formulas (AOC)
+              </h2>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {Object.entries(formulas).map(([type, formula]) => (
-                <div key={type} className="border border-slate-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-700 mb-3 capitalize">{type}</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm text-slate-600">Tax per Liter ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formula.taxPerLiter}
-                        onChange={(e) => {
-                          const newFormulas = {
-                            ...formulas,
-                            [type]: { ...formula, taxPerLiter: parseFloat(e.target.value) || 0 }
-                          };
-                          saveFormulas(newFormulas);
-                        }}
-                        className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                      />
+            {!collapsedSections.formulas && (
+              <>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {Object.entries(formulas).map(([type, formula]) => (
+                    <div key={type} className="border border-slate-200 rounded-lg p-4">
+                      <h3 className="font-semibold text-slate-700 mb-3 capitalize">{type}</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm text-slate-600">Tax per Liter ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formula.taxPerLiter}
+                            onChange={(e) => {
+                              const newFormulas = {
+                                ...formulas,
+                                [type]: { ...formula, taxPerLiter: parseFloat(e.target.value) || 0 }
+                              };
+                              saveFormulas(newFormulas);
+                            }}
+                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm text-slate-600">Fixed Tax ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formula.taxFixed}
+                            onChange={(e) => {
+                              const newFormulas = {
+                                ...formulas,
+                                [type]: { ...formula, taxFixed: parseFloat(e.target.value) || 0 }
+                              };
+                              saveFormulas(newFormulas);
+                            }}
+                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm text-slate-600">Shipping per Case ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formula.shippingPerCase}
+                            onChange={(e) => {
+                              const newFormulas = {
+                                ...formulas,
+                                [type]: { ...formula, shippingPerCase: parseFloat(e.target.value) || 0 }
+                              };
+                              saveFormulas(newFormulas);
+                            }}
+                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm text-slate-600">Margin Divisor</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formula.marginDivisor}
+                            onChange={(e) => {
+                              const newFormulas = {
+                                ...formulas,
+                                [type]: { ...formula, marginDivisor: parseFloat(e.target.value) || 0.65 }
+                              };
+                              saveFormulas(newFormulas);
+                            }}
+                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm text-slate-600">SRP Multiplier</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={formula.srpMultiplier}
+                            onChange={(e) => {
+                              const newFormulas = {
+                                ...formulas,
+                                [type]: { ...formula, srpMultiplier: parseFloat(e.target.value) || 1.47 }
+                              };
+                              saveFormulas(newFormulas);
+                            }}
+                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-sm text-slate-600">Fixed Tax ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formula.taxFixed}
-                        onChange={(e) => {
-                          const newFormulas = {
-                            ...formulas,
-                            [type]: { ...formula, taxFixed: parseFloat(e.target.value) || 0 }
-                          };
-                          saveFormulas(newFormulas);
-                        }}
-                        className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-slate-600">Shipping per Case ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formula.shippingPerCase}
-                        onChange={(e) => {
-                          const newFormulas = {
-                            ...formulas,
-                            [type]: { ...formula, shippingPerCase: parseFloat(e.target.value) || 0 }
-                          };
-                          saveFormulas(newFormulas);
-                        }}
-                        className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-slate-600">Margin Divisor</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formula.marginDivisor}
-                        onChange={(e) => {
-                          const newFormulas = {
-                            ...formulas,
-                            [type]: { ...formula, marginDivisor: parseFloat(e.target.value) || 0.65 }
-                          };
-                          saveFormulas(newFormulas);
-                        }}
-                        className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-slate-600">SRP Multiplier</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formula.srpMultiplier}
-                        onChange={(e) => {
-                          const newFormulas = {
-                            ...formulas,
-                            [type]: { ...formula, srpMultiplier: parseFloat(e.target.value) || 1.47 }
-                          };
-                          saveFormulas(newFormulas);
-                        }}
-                        className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                      />
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <div className="mt-4 p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
-              <p className="font-semibold mb-2">Formula Logic:</p>
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Case Size (L) = (Bottles/Case × Bottle Size ML) ÷ 1000</li>
-                <li>Tax = (Case Size L × Tax/Liter) + Fixed Tax</li>
-                <li>Laid In = FOB + Shipping + Tax</li>
-                <li>Wholesale Case = Laid In ÷ {formulas.wine.marginDivisor}</li>
-                <li>Wholesale Bottle = Wholesale Case ÷ Bottles/Case</li>
-                <li>SRP = ROUNDUP(Wholesale Bottle × {formulas.wine.srpMultiplier}, 0) - $0.01</li>
-                <li>Frontline Bottle = SRP ÷ {formulas.wine.srpMultiplier}</li>
-              </ol>
-            </div>
+                <div className="mt-4 p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
+                  <p className="font-semibold mb-2">Formula Logic:</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Case Size (L) = (Bottles/Case × Bottle Size ML) ÷ 1000</li>
+                    <li>Tax = (Case Size L × Tax/Liter) + Fixed Tax</li>
+                    <li>Laid In = FOB + Shipping + Tax</li>
+                    <li>Wholesale Case = Laid In ÷ {formulas.wine.marginDivisor}</li>
+                    <li>Wholesale Bottle = Wholesale Case ÷ Bottles/Case</li>
+                    <li>SRP = ROUNDUP(Wholesale Bottle × {formulas.wine.srpMultiplier}, 0) - $0.01</li>
+                    <li>Frontline Bottle = SRP ÷ {formulas.wine.srpMultiplier}</li>
+                  </ol>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Supplier Management */}
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-              <Users className="w-6 h-6 mr-2 text-rose-600" />
-              Supplier Management
-            </h2>
+            <div
+              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('suppliers')}
+            >
+              {collapsedSections.suppliers ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+              <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <Users className="w-6 h-6 mr-2 text-rose-600" />
+                Supplier Management
+              </h2>
+            </div>
 
-            {suppliers.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No suppliers yet</p>
-            ) : (
-              <div className="space-y-3">
-                {suppliers.map(supplier => {
-                  const supplierProducts = products.filter(p => p.supplier === supplier);
-                  const latestUpload = supplierProducts.length > 0
-                    ? new Date(Math.max(...supplierProducts.map(p => new Date(p.uploadDate)))).toLocaleDateString()
-                    : 'Unknown';
+            {!collapsedSections.suppliers && (
+              <>
 
-                  return (
-                    <div key={supplier} className="border border-slate-200 rounded-lg p-4 flex justify-between items-center hover:shadow-md transition-shadow">
-                      <div>
-                        <p className="font-semibold text-slate-800">{supplier}</p>
-                        <p className="text-sm text-slate-600">{supplierProducts.length} products</p>
-                        <p className="text-xs text-slate-400">Last updated: {latestUpload}</p>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          if (window.confirm(`Remove all products from ${supplier}? This cannot be undone.`)) {
-                            const updatedProducts = products.filter(p => p.supplier !== supplier);
-                            await saveProducts(updatedProducts);
-                          }
-                        }}
-                        className="px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors text-sm"
-                      >
-                        Remove Supplier
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                {suppliers.length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">No suppliers yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {suppliers.map(supplier => {
+                      const supplierProducts = products.filter(p => p.supplier === supplier);
+                      const latestUpload = supplierProducts.length > 0
+                        ? new Date(Math.max(...supplierProducts.map(p => new Date(p.uploadDate)))).toLocaleDateString()
+                        : 'Unknown';
+
+                      return (
+                        <div key={supplier} className="border border-slate-200 rounded-lg p-4 flex justify-between items-center hover:shadow-md transition-shadow">
+                          <div>
+                            <p className="font-semibold text-slate-800">{supplier}</p>
+                            <p className="text-sm text-slate-600">{supplierProducts.length} products</p>
+                            <p className="text-xs text-slate-400">Last updated: {latestUpload}</p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (window.confirm(`Remove all products from ${supplier}? This cannot be undone.`)) {
+                                const updatedProducts = products.filter(p => p.supplier !== supplier);
+                                await saveProducts(updatedProducts);
+                              }
+                            }}
+                            className="px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors text-sm"
+                          >
+                            Remove Supplier
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Upload Section */}
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center">
-              <Upload className="w-6 h-6 mr-2 text-rose-600" />
-              Upload Price List
-            </h2>
-
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-rose-400 transition-colors">
-              <input
-                type="file"
-                accept=".xlsx,.xls,.pdf"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="file-upload"
-                ref={(input) => { window.fileInput = input; }}
-              />
-              <FileSpreadsheet className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-              <p className="text-lg font-semibold text-slate-700 mb-4">Upload Price List</p>
-              <p className="text-sm text-slate-500 mb-4">Supports Excel (.xlsx, .xls) and PDF formats</p>
-              <button
-                onClick={() => document.getElementById('file-upload')?.click()}
-                className="px-6 py-3 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-semibold"
-              >
-                Choose File
-              </button>
+            <div
+              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('upload')}
+            >
+              {collapsedSections.upload ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+              <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <Upload className="w-6 h-6 mr-2 text-rose-600" />
+                Upload Price List
+              </h2>
             </div>
 
-            {uploadStatus && (
-              <div className={`mt-4 p-4 rounded-lg ${uploadStatus.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                {uploadStatus}
-              </div>
+            {!collapsedSections.upload && (
+              <>
+
+                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-rose-400 transition-colors">
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.pdf"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="file-upload"
+                    ref={(input) => { window.fileInput = input; }}
+                  />
+                  <FileSpreadsheet className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                  <p className="text-lg font-semibold text-slate-700 mb-4">Upload Price List</p>
+                  <p className="text-sm text-slate-500 mb-4">Supports Excel (.xlsx, .xls) and PDF formats</p>
+                  <button
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    className="px-6 py-3 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-semibold"
+                  >
+                    Choose File
+                  </button>
+                </div>
+
+                {uploadStatus && (
+                  <div className={`mt-4 p-4 rounded-lg ${uploadStatus.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                    {uploadStatus}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Louis Dressner PDF Converter Section */}
           <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 shadow-lg border-2 border-purple-200 mb-8">
-            <h2 className="text-xl font-bold text-slate-800 mb-2 flex items-center">
-              <FileSpreadsheet className="w-6 h-6 mr-2 text-purple-600" />
-              Louis Dressner PDF Quick Converter
-            </h2>
-            <p className="text-sm text-slate-600 mb-4">
-              For Louis Dressner PDFs: Use the Python script or Mac app below to convert, then upload the Excel file above. ↑
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white rounded-lg p-4 border border-purple-200">
-                <h3 className="font-semibold text-slate-800 mb-2">📱 Mac App (Drag & Drop)</h3>
-                <p className="text-xs text-slate-600 mb-3">Download and set up once, then just drag PDFs onto the app</p>
-                <a
-                  href="/api/placeholder/download/mac-app"
-                  className="text-xs px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 inline-block"
-                  download="louis_dressner_converter_mac.py"
-                >
-                  Download Mac App Files
-                </a>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border border-purple-200">
-                <h3 className="font-semibold text-slate-800 mb-2">🐍 Python Script (Command Line)</h3>
-                <p className="text-xs text-slate-600 mb-2">Run from terminal:</p>
-                <code className="text-xs bg-slate-100 p-2 rounded block mb-2">
-                  python3 convert.py input.pdf output.xlsx
-                </code>
-                <a
-                  href="/api/placeholder/download/python-script"
-                  className="text-xs px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 inline-block"
-                  download="convert_louis_dressner_pdf.py"
-                >
-                  Download Python Script
-                </a>
-              </div>
+            <div
+              className="flex items-center mb-2 cursor-pointer hover:bg-purple-100/50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('dressner')}
+            >
+              {collapsedSections.dressner ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+              <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <FileSpreadsheet className="w-6 h-6 mr-2 text-purple-600" />
+                Louis Dressner PDF Quick Converter
+              </h2>
             </div>
 
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-800">
-                <strong>💡 Quick Start:</strong> Download the files above → Follow MAC_INSTALLATION.md instructions →
-                Convert your PDFs → Upload the resulting Excel files using the regular upload section above
-              </p>
-            </div>
+            {!collapsedSections.dressner && (
+              <>
+                <p className="text-sm text-slate-600 mb-4">
+                  For Louis Dressner PDFs: Use the Python script or Mac app below to convert, then upload the Excel file above. ↑
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-lg p-4 border border-purple-200">
+                    <h3 className="font-semibold text-slate-800 mb-2">📱 Mac App (Drag & Drop)</h3>
+                    <p className="text-xs text-slate-600 mb-3">Download and set up once, then just drag PDFs onto the app</p>
+                    <a
+                      href="/api/placeholder/download/mac-app"
+                      className="text-xs px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 inline-block"
+                      download="louis_dressner_converter_mac.py"
+                    >
+                      Download Mac App Files
+                    </a>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border border-purple-200">
+                    <h3 className="font-semibold text-slate-800 mb-2">🐍 Python Script (Command Line)</h3>
+                    <p className="text-xs text-slate-600 mb-2">Run from terminal:</p>
+                    <code className="text-xs bg-slate-100 p-2 rounded block mb-2">
+                      python3 convert.py input.pdf output.xlsx
+                    </code>
+                    <a
+                      href="/api/placeholder/download/python-script"
+                      className="text-xs px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 inline-block"
+                      download="convert_louis_dressner_pdf.py"
+                    >
+                      Download Python Script
+                    </a>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800">
+                    <strong>💡 Quick Start:</strong> Download the files above → Follow MAC_INSTALLATION.md instructions →
+                    Convert your PDFs → Upload the resulting Excel files using the regular upload section above
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Column Mapping UI */}
-          {pendingUpload && columnMapping && (
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-slate-800">
-                  Map Columns - {pendingUpload.file.name}
-                </h2>
-                {pendingUpload.hasTemplate && (
-                  <span className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full">
-                    ✓ Using saved template
-                  </span>
-                )}
-              </div>
+          {
+            pendingUpload && columnMapping && (
+              <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-slate-800">
+                    Map Columns - {pendingUpload.file.name}
+                  </h2>
+                  {pendingUpload.hasTemplate && (
+                    <span className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full">
+                      ✓ Using saved template
+                    </span>
+                  )}
+                </div>
 
-              {/* Supplier Name Editor */}
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Supplier Name
-                </label>
-                <input
-                  type="text"
-                  value={pendingUpload.supplierName}
-                  onChange={(e) => setPendingUpload({
-                    ...pendingUpload,
-                    supplierName: e.target.value
-                  })}
-                  placeholder="Enter supplier name (e.g., Rosenthal Wine Merchant)"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
-                <p className="text-xs text-slate-600 mt-2">
-                  This name will be used to identify all products from this supplier.
-                  Clean supplier names help with organization and filtering.
+                {/* Supplier Name Editor */}
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    Supplier Name
+                  </label>
+                  <input
+                    type="text"
+                    value={pendingUpload.supplierName}
+                    onChange={(e) => setPendingUpload({
+                      ...pendingUpload,
+                      supplierName: e.target.value
+                    })}
+                    placeholder="Enter supplier name (e.g., Rosenthal Wine Merchant)"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <p className="text-xs text-slate-600 mt-2">
+                    This name will be used to identify all products from this supplier.
+                    Clean supplier names help with organization and filtering.
+                  </p>
+                </div>
+
+                <p className="text-sm text-slate-600 mb-4">
+                  Please verify the column mapping below. Adjust any incorrect mappings before importing.
+                  {!pendingUpload.hasTemplate && " This mapping will be saved as a template for future uploads from this supplier."}
                 </p>
-              </div>
 
-              <p className="text-sm text-slate-600 mb-4">
-                Please verify the column mapping below. Adjust any incorrect mappings before importing.
-                {!pendingUpload.hasTemplate && " This mapping will be saved as a template for future uploads from this supplier."}
-              </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {Object.entries(columnMapping).map(([field, colIndex]) => (
+                    <div key={field} className="border border-slate-200 rounded-lg p-3">
+                      <label className="block text-sm font-medium text-slate-700 mb-2 capitalize">
+                        {field.replace(/([A-Z])/g, ' $1').trim()}
+                      </label>
+                      <select
+                        value={colIndex}
+                        onChange={(e) => setColumnMapping({
+                          ...columnMapping,
+                          [field]: parseInt(e.target.value)
+                        })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      >
+                        <option value="-1">-- Not mapped --</option>
+                        {pendingUpload.headers.map((header, idx) => (
+                          <option key={idx} value={idx}>
+                            Column {idx + 1}: {header || '(empty)'}
+                          </option>
+                        ))}
+                      </select>
+                      {colIndex >= 0 && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Sample: {pendingUpload.data[1]?.[colIndex] || '(empty)'}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {Object.entries(columnMapping).map(([field, colIndex]) => (
-                  <div key={field} className="border border-slate-200 rounded-lg p-3">
-                    <label className="block text-sm font-medium text-slate-700 mb-2 capitalize">
-                      {field.replace(/([A-Z])/g, ' $1').trim()}
-                    </label>
-                    <select
-                      value={colIndex}
-                      onChange={(e) => setColumnMapping({
-                        ...columnMapping,
-                        [field]: parseInt(e.target.value)
-                      })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                    >
-                      <option value="-1">-- Not mapped --</option>
-                      {pendingUpload.headers.map((header, idx) => (
-                        <option key={idx} value={idx}>
-                          Column {idx + 1}: {header || '(empty)'}
-                        </option>
-                      ))}
-                    </select>
-                    {colIndex >= 0 && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        Sample: {pendingUpload.data[1]?.[colIndex] || '(empty)'}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Preview Section */}
-              <div className="mb-6 border-t border-slate-200 pt-6">
-                <h3 className="text-lg font-semibold text-slate-800 mb-3">Preview (First 5 Products)</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-100">
-                      <tr>
-                        <th className="text-left p-2">Producer</th>
-                        <th className="text-left p-2">Product</th>
-                        <th className="text-left p-2">Vintage</th>
-                        <th className="text-left p-2">Size</th>
-                        <th className="text-left p-2">Pack</th>
-                        <th className="text-left p-2">Type</th>
-                        <th className="text-right p-2">FOB</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingUpload.data.slice(1, 6).map((row, idx) => (
-                        <tr key={idx} className="border-b border-slate-100">
-                          <td className="p-2">{columnMapping.producer >= 0 ? row[columnMapping.producer] : '-'}</td>
-                          <td className="p-2">{columnMapping.productName >= 0 ? row[columnMapping.productName] : '-'}</td>
-                          <td className="p-2">{columnMapping.vintage >= 0 ? row[columnMapping.vintage] : '-'}</td>
-                          <td className="p-2">{columnMapping.bottleSize >= 0 ? row[columnMapping.bottleSize] : '-'}</td>
-                          <td className="p-2">{columnMapping.packSize >= 0 ? row[columnMapping.packSize] : '-'}</td>
-                          <td className="p-2">{columnMapping.productType >= 0 ? row[columnMapping.productType] : '-'}</td>
-                          <td className="p-2 text-right">{columnMapping.fobCasePrice >= 0 ? `$${row[columnMapping.fobCasePrice]}` : '-'}</td>
-                          <td className="p-2">{columnMapping.productLink >= 0 ? (row[columnMapping.productLink] ? '✓' : '-') : '-'}</td>
+                {/* Preview Section */}
+                <div className="mb-6 border-t border-slate-200 pt-6">
+                  <h3 className="text-lg font-semibold text-slate-800 mb-3">Preview (First 5 Products)</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-100">
+                        <tr>
+                          <th className="text-left p-2">Producer</th>
+                          <th className="text-left p-2">Product</th>
+                          <th className="text-left p-2">Vintage</th>
+                          <th className="text-left p-2">Size</th>
+                          <th className="text-left p-2">Pack</th>
+                          <th className="text-left p-2">Type</th>
+                          <th className="text-right p-2">FOB</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {pendingUpload.data.slice(1, 6).map((row, idx) => (
+                          <tr key={idx} className="border-b border-slate-100">
+                            <td className="p-2">{columnMapping.producer >= 0 ? row[columnMapping.producer] : '-'}</td>
+                            <td className="p-2">{columnMapping.productName >= 0 ? row[columnMapping.productName] : '-'}</td>
+                            <td className="p-2">{columnMapping.vintage >= 0 ? row[columnMapping.vintage] : '-'}</td>
+                            <td className="p-2">{columnMapping.bottleSize >= 0 ? row[columnMapping.bottleSize] : '-'}</td>
+                            <td className="p-2">{columnMapping.packSize >= 0 ? row[columnMapping.packSize] : '-'}</td>
+                            <td className="p-2">{columnMapping.productType >= 0 ? row[columnMapping.productType] : '-'}</td>
+                            <td className="p-2 text-right">{columnMapping.fobCasePrice >= 0 ? `$${row[columnMapping.fobCasePrice]}` : '-'}</td>
+                            <td className="p-2">{columnMapping.productLink >= 0 ? (row[columnMapping.productLink] ? '✓' : '-') : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex space-x-4">
+                  <button
+                    onClick={confirmMapping}
+                    className="px-6 py-3 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg hover:from-rose-700 hover:to-rose-800 transition-all duration-200 shadow-lg"
+                  >
+                    Import Products
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPendingUpload(null);
+                      setColumnMapping(null);
+                    }}
+                    className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
-
-              <div className="flex space-x-4">
-                <button
-                  onClick={confirmMapping}
-                  className="px-6 py-3 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg hover:from-rose-700 hover:to-rose-800 transition-all duration-200 shadow-lg"
-                >
-                  Import Products
-                </button>
-                <button
-                  onClick={() => {
-                    setPendingUpload(null);
-                    setColumnMapping(null);
-                  }}
-                  className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+            )
+          }
+        </div >
       </div >
     );
   }
