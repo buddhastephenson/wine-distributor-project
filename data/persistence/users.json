@@ -106,5 +106,11 @@
     "username": "admin-test",
     "password": "password",
     "type": "admin"
+  },
+  {
+    "id": "user-1769630579434",
+    "username": "Bugsy Wine Bar",
+    "password": "password",
+    "type": "customer"
   }
 ]

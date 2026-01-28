@@ -3,15 +3,24 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
+const multer = require('multer');
+const XLSX = require('xlsx');
 
 const app = express();
 const PORT = 3001;
 const DATA_DIR = path.join(__dirname, 'data', 'persistence');
 
-// Ensure data directory exists
+// Ensure directories exist
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const upload = multer({ dest: 'uploads/' });
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -61,18 +70,18 @@ const saveUsers = (users) => {
 };
 
 app.post('/api/auth/signup', (req, res) => {
-    const { username, password, type } = req.body;
+    const { username, password, type, email } = req.body;
     const users = getUsers();
 
     if (users.find(u => u.username === username)) {
         return res.status(400).json({ error: 'User already exists' });
     }
 
-    const newUser = { id: `user-${Date.now()}`, username, password, type };
+    const newUser = { id: `user-${Date.now()}`, username, password, type, email };
     users.push(newUser);
     saveUsers(users);
 
-    res.json({ success: true, user: { id: newUser.id, username, type } });
+    res.json({ success: true, user: { id: newUser.id, username, type, email } });
 });
 
 app.post('/api/auth/login', (req, res) => {
@@ -101,6 +110,52 @@ app.delete('/api/storage/:key', (req, res) => {
     } else {
         res.status(404).json({ error: 'Key not found' });
     }
+});
+
+// --- PDF Processing Endpoint ---
+
+app.post('/api/upload/pdf', upload.single('pdf'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const inputPath = req.file.path;
+    const outputPath = `${inputPath}.xlsx`;
+    const scriptPath = path.join(__dirname, 'converters', 'convert_louis_dressner_pdf.py');
+
+    console.log(`Processing PDF: ${req.file.originalname}`);
+
+    exec(`python3 "${scriptPath}" "${inputPath}" "${outputPath}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`exec error: ${error}`);
+            // Attempt cleanup
+            if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            return res.status(500).json({ error: 'PDF conversion failed', details: stderr });
+        }
+
+        try {
+            if (!fs.existsSync(outputPath)) {
+                throw new Error('Output file not found');
+            }
+
+            const workbook = XLSX.readFile(outputPath);
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+            // Clean up files
+            fs.unlinkSync(inputPath);
+            fs.unlinkSync(outputPath);
+
+            res.json({
+                success: true,
+                data: jsonData,
+                filename: req.file.originalname
+            });
+        } catch (readError) {
+            console.error(`Read error: ${readError}`);
+            res.status(500).json({ error: 'Failed to read converted Excel file' });
+        }
+    });
 });
 
 app.listen(PORT, () => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2 } from 'lucide-react';
+import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const WineDistributorApp = () => {
@@ -67,6 +67,7 @@ const WineDistributorApp = () => {
   const [authUsername, setAuthUsername] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authUserType, setAuthUserType] = useState('customer');
+  const [authEmail, setAuthEmail] = useState('');
   const [authError, setAuthError] = useState('');
 
   // Load data from storage on mount
@@ -178,7 +179,8 @@ const WineDistributorApp = () => {
         body: JSON.stringify({
           username: authUsername,
           password: authPassword,
-          type: authUserType
+          type: authUserType,
+          email: authEmail
         })
       });
       const data = await response.json();
@@ -295,30 +297,68 @@ const WineDistributorApp = () => {
         const formData = new FormData();
         formData.append('pdf', file);
 
-        // For the MVP, we'll provide instructions for PDF conversion
-        // In production, this would call a backend API
-        const shouldProceed = window.confirm(
-          `PDF Upload Detected: ${file.name}\n\n` +
-          `We can process this PDF automatically, but it requires a backend service.\n\n` +
-          `For now, would you like to:\n` +
-          `- Click OK to see instructions for converting PDF to Excel\n` +
-          `- Click Cancel to upload a different file`
-        );
+        try {
+          const response = await fetch('http://localhost:3001/api/upload/pdf', {
+            method: 'POST',
+            body: formData,
+          });
 
-        if (shouldProceed) {
-          setUploadStatus(
-            `To upload "${file.name}":\n\n` +
-            `1. Open the PDF in Adobe Acrobat or your PDF viewer\n` +
-            `2. Export/Save As → Excel (.xlsx)\n` +
-            `3. Upload the Excel file here\n\n` +
-            `OR\n\n` +
-            `Use an online converter like:\n` +
-            `- smallpdf.com/pdf-to-excel\n` +
-            `- ilovepdf.com/pdf_to_excel\n\n` +
-            `Then upload the resulting Excel file.`
-          );
-        } else {
-          setUploadStatus('');
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Server error: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          if (result.success) {
+            const jsonData = result.data;
+
+            // Get headers from first row
+            const headers = jsonData[0].map(h => String(h || '').trim());
+
+            // Extract clean supplier name from filename
+            const cleanSupplierName = extractSupplierName(file.name);
+
+            // Check if we have a saved template for this supplier
+            const savedTemplate = mappingTemplates[cleanSupplierName];
+
+            let autoMapping;
+            if (savedTemplate) {
+              // Use saved template
+              autoMapping = savedTemplate;
+              setUploadStatus(`Found saved mapping template for ${cleanSupplierName}`);
+            } else {
+              // Auto-detect columns
+              autoMapping = {
+                itemCode: findColumnIndex(headers, ['item code', 'sku', 'code', 'item', 'item#']),
+                producer: findColumnIndex(headers, ['producer', 'winery', 'brand', 'manufacturer', 'supplier']),
+                productName: findColumnIndex(headers, ['product', 'name', 'wine', 'description', 'item']),
+                vintage: findColumnIndex(headers, ['vintage', 'year']),
+                packSize: findColumnIndex(headers, ['pack', 'pack size', 'case size', 'cs', 'btl/cs']),
+                bottleSize: findColumnIndex(headers, ['bottle', 'bottle size', 'size', 'ml', 'volume']),
+                productType: findColumnIndex(headers, ['type', 'category', 'product type', 'class']),
+                fobCasePrice: findColumnIndex(headers, ['fob', 'price', 'case price', 'cost', 'wholesale']),
+                productLink: findColumnIndex(headers, ['link', 'url', 'website', 'info'])
+              };
+            }
+
+            setPendingUpload({
+              file,
+              headers,
+              data: jsonData,
+              autoMapping,
+              supplierName: cleanSupplierName,
+              hasTemplate: !!savedTemplate
+            });
+
+            setColumnMapping(autoMapping);
+            setTimeout(() => setUploadStatus(''), 2000);
+          } else {
+            throw new Error(result.error || 'Conversion failed');
+          }
+        } catch (error) {
+          console.error('PDF conversion error:', error);
+          setUploadStatus(`PDF Conversion Error: ${error.message}`);
+          setTimeout(() => setUploadStatus(''), 5000);
         }
       } else {
         // Handle Excel file (existing code)
@@ -461,16 +501,23 @@ const WineDistributorApp = () => {
       const oldSupplierProducts = products.filter(p => p.supplier === supplierName);
       const otherProducts = products.filter(p => p.supplier !== supplierName);
 
-      // Check which old products are in active orders
-      const productIdsInOrders = new Set();
+      // Check which old products are in active orders OR ongoing lists
+      const productIdsInActiveUse = new Set();
+
+      // Check Orders
       orders.forEach(order => {
         if (order.status !== 'completed' && order.status !== 'cancelled') {
-          order.items.forEach(item => productIdsInOrders.add(item.id));
+          order.items.forEach(item => productIdsInActiveUse.add(item.id));
         }
       });
 
-      // Move old products that are in orders to discontinued list
-      const productsToDiscontinue = oldSupplierProducts.filter(p => productIdsInOrders.has(p.id));
+      // Check Special Order Lists
+      Object.values(allCustomerLists).forEach(list => {
+        list.forEach(item => productIdsInActiveUse.add(item.id));
+      });
+
+      // Move old products that are in active use to discontinued list
+      const productsToDiscontinue = oldSupplierProducts.filter(p => productIdsInActiveUse.has(p.id));
       if (productsToDiscontinue.length > 0) {
         const updatedDiscontinued = [
           ...discontinuedProducts.filter(d => !productsToDiscontinue.find(p => p.id === d.id)), // Remove duplicates
@@ -536,7 +583,9 @@ const WineDistributorApp = () => {
         ...product,
         cases: 1,
         bottles: 0,
-        quantity: packSize
+        quantity: packSize,
+        status: 'Requested',
+        notes: ''
       }];
 
       const updatedAllLists = {
@@ -557,7 +606,6 @@ const WineDistributorApp = () => {
     const userList = allCustomerLists[username] || [];
 
     const newList = userList.map(item => {
-      // ... existing map logic ...
       if (item.id === productId) {
         const newUnits = {
           cases: unitType === 'cases' ? val : item.cases,
@@ -571,6 +619,26 @@ const WineDistributorApp = () => {
           ...newUnits,
           quantity: totalQuantity
         };
+      }
+      return item;
+    });
+
+    const updatedAllLists = {
+      ...allCustomerLists,
+      [username]: newList
+    };
+
+    await saveSpecialOrderLists(updatedAllLists);
+    setAllCustomerLists(updatedAllLists);
+    setSpecialOrderList(newList);
+  };
+
+  const updateListItemMetadata = async (productId, status, notes) => {
+    const username = selectedCustomerForList || currentUser.username;
+    const userList = allCustomerLists[username] || [];
+    const newList = userList.map(item => {
+      if (item.id === productId) {
+        return { ...item, status, notes };
       }
       return item;
     });
@@ -703,6 +771,41 @@ const WineDistributorApp = () => {
     XLSX.writeFile(workbook, `AOC_Orders_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const generateSpecialOrderReport = () => {
+    const allItems = [];
+    Object.entries(allCustomerLists).forEach(([username, items]) => {
+      items.forEach(item => {
+        allItems.push({
+          'Customer': username,
+          'Establishment': username,
+          'Date': new Date().toLocaleDateString(),
+          'Producer': item.producer,
+          'Item': item.productName,
+          'Item Code': item.itemCode || '',
+          'Size': item.bottleSize || '',
+          'Pack': item.packSize || '',
+          'FOB Case': item.fobCasePrice || 0,
+          'Frontline Btl': item.frontlinePrice || 0,
+          'Cases': item.cases || 0,
+          'Bottles': item.bottles || 0,
+          'Total Bottles': item.quantity,
+          'Status': item.status || 'Requested',
+          'Notes': item.notes || ''
+        });
+      });
+    });
+
+    if (allItems.length === 0) {
+      alert('No special order requests to export');
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(allItems);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Special Order Requests');
+    XLSX.writeFile(workbook, `AOC_Special_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const filteredProducts = products.filter(product => {
     const matchesSearch =
       product.producer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -720,82 +823,99 @@ const WineDistributorApp = () => {
   // Login View
   if (view === 'login') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-rose-50 to-purple-50 flex items-center justify-center p-4">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl p-8 max-w-md w-full border border-amber-200/50">
-          <div className="flex flex-col items-center justify-center mb-8 text-center">
-            <Wine className="w-16 h-16 text-rose-600 mb-4" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-rose-600 to-purple-600 bg-clip-text text-transparent">
-              AOC Special Order Request Portal
+      <div className="min-h-screen bg-[#faf9f6] flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Abstract background elements */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-rose-100 rounded-full blur-[120px] opacity-40 animate-pulse"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-100 rounded-full blur-[120px] opacity-40 animate-pulse"></div>
+
+        <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] p-10 max-w-md w-full border border-white/50 relative z-10">
+          <div className="flex flex-col items-center justify-center mb-10 text-center">
+            <div className="w-20 h-20 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-rose-100/50">
+              <Wine className="w-10 h-10 text-rose-600" />
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 mb-2">
+              AOC Wines
             </h1>
-            <p className="text-slate-500 mt-2">
-              {authMode === 'login' ? 'Welcome back! Please enter your details.' : 'Create your account to start ordering.'}
+            <p className="text-slate-500 font-medium tracking-wide uppercase text-xs">
+              {authMode === 'login' ? 'Partner Portal' : 'Create Account'}
             </p>
           </div>
 
-          <form onSubmit={authMode === 'login' ? handleLogin : handleSignup} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
+          <form onSubmit={authMode === 'login' ? handleLogin : handleSignup} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[13px] font-semibold text-slate-700 ml-1 uppercase tracking-wider">Establishment</label>
               <input
                 type="text"
                 required
                 value={authUsername}
                 onChange={(e) => setAuthUsername(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                placeholder="Enter your username"
+                className="w-full px-5 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all duration-200 placeholder:text-slate-400 font-medium"
+                placeholder="Name or Username"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+            {authMode === 'signup' && (
+              <div className="space-y-2">
+                <label className="text-[13px] font-semibold text-slate-700 ml-1 uppercase tracking-wider">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full px-5 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all duration-200 placeholder:text-slate-400 font-medium"
+                  placeholder="notifications@establishment.com"
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <label className="text-[13px] font-semibold text-slate-700 ml-1 uppercase tracking-wider">Password</label>
               <input
                 type="password"
                 required
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
+                className="w-full px-5 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all duration-200 placeholder:text-slate-400 font-medium"
                 placeholder="••••••••"
               />
             </div>
 
             {authMode === 'signup' && (
-              <div className="flex items-center space-x-2 py-2">
+              <div className="flex items-center space-x-3 py-1 ml-1 cursor-pointer group">
                 <input
                   type="checkbox"
                   id="admin-toggle"
                   checked={authUserType === 'admin'}
                   onChange={(e) => setAuthUserType(e.target.checked ? 'admin' : 'customer')}
-                  className="w-4 h-4 text-rose-600 focus:ring-rose-500 border-gray-300 rounded"
+                  className="w-5 h-5 text-rose-600 focus:ring-rose-500/20 border-slate-300 rounded-lg cursor-pointer transition-all duration-200"
                 />
-                <label htmlFor="admin-toggle" className="text-sm font-medium text-slate-700">
+                <label htmlFor="admin-toggle" className="text-sm font-medium text-slate-600 cursor-pointer group-hover:text-slate-900 transition-colors">
                   Request Admin Access
                 </label>
               </div>
             )}
 
             {authError && (
-              <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg text-center font-medium">
+              <div className="p-4 bg-rose-50 border border-rose-100/50 text-rose-700 text-sm rounded-2xl text-center font-medium animate-in fade-in slide-in-from-top-2 duration-300">
                 {authError}
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-rose-600 to-rose-700 text-white py-4 rounded-xl font-semibold hover:from-rose-700 hover:to-rose-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="w-full bg-[#1a1a1a] text-white py-4 rounded-2xl font-bold hover:bg-slate-900 transition-all duration-200 shadow-xl shadow-slate-200 hover:shadow-2xl hover:shadow-slate-300 transform hover:-translate-y-0.5 active:translate-y-0 active:shadow-lg"
             >
-              {authMode === 'login' ? 'Log In' : 'Create Account'}
+              {authMode === 'login' ? 'Continue to Portal' : 'Create My Account'}
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-200 text-center">
+          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <button
               onClick={() => {
                 setAuthMode(authMode === 'login' ? 'signup' : 'login');
                 setAuthError('');
               }}
-              className="text-sm font-medium text-rose-600 hover:text-rose-700 transition-colors"
+              className="text-slate-500 font-medium hover:text-rose-600 transition-colors duration-200 h-10 px-4 rounded-xl hover:bg-rose-50"
             >
-              {authMode === 'login'
-                ? "Don't have an account? Sign up"
-                : "Already have an account? Log in"}
+              {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Log In"}
             </button>
           </div>
         </div>
@@ -803,1078 +923,1307 @@ const WineDistributorApp = () => {
     );
   }
 
-  // Admin View
-  if (view === 'admin') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <nav className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <Wine className="w-8 h-8 text-rose-600" />
-              <h1 className="text-2xl font-bold text-slate-800">Admin Dashboard</h1>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </nav>
-
-        <div className="p-6 max-w-7xl mx-auto">
-          {/* Clear Data Button */}
-          <div className="mb-6">
-            <button
-              onClick={async () => {
-                setDeleteConfirmation({
-                  type: 'reset',
-                  name: 'ALL SYSTEM DATA'
-                });
-              }}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Clear All Data & Reset
-            </button>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-sm font-medium">Total Products</p>
-                  <p className="text-3xl font-bold text-slate-800 mt-1">{products.length}</p>
+  // Authenticated View
+  return (
+    <div className="min-h-screen bg-[#faf9f6]">
+      {view === 'admin' ? (
+        <div className="admin-view-transition-container">
+          <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50 px-8 py-5">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center border border-rose-100/50">
+                  <Wine className="w-6 h-6 text-rose-600" />
                 </div>
-                <Package className="w-12 h-12 text-blue-500 opacity-20" />
+                <div>
+                  <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">AOC Wines</h1>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Admin Dashboard</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2 text-slate-600">
+                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200/50">
+                    <UserCheck className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <span className="text-sm font-bold tracking-tight">{currentUser.username}</span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center space-x-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all duration-200 font-bold text-sm"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          </nav>
+
+          <div className="p-8 max-w-7xl mx-auto">
+            {/* Admin Tools */}
+            <div className="flex justify-start mb-10">
+              <button
+                onClick={async () => {
+                  setDeleteConfirmation({
+                    type: 'reset',
+                    name: 'ALL SYSTEM DATA'
+                  });
+                }}
+                className="px-6 py-3 bg-white text-rose-600 border border-rose-100 rounded-2xl font-bold text-sm hover:bg-rose-50 transition-all duration-200 shadow-sm flex items-center space-x-2 active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Reset Entire Database</span>
+              </button>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+              <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100/50">
+                    <Package className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Catalog</p>
+                <p className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">{products.length}</p>
+                <p className="text-xs text-slate-400 mt-2 font-medium italic">Unique products</p>
+              </div>
+
+              <div
+                onClick={generateOrderReport}
+                className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 cursor-pointer hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-900/[0.03] transition-all duration-300 group"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-100/50 group-hover:bg-emerald-600 group-hover:border-emerald-600 transition-all duration-300">
+                    <ShoppingCart className="w-6 h-6 text-emerald-600 group-hover:text-white transition-all duration-300" />
+                  </div>
+                  <div className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full opacity-0 group-hover:opacity-100 transition-opacity">EXPORT XLS</div>
+                </div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest group-hover:text-emerald-700 transition-colors">Historical Orders</p>
+                <p className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">{orders.length}</p>
+                <p className="text-xs text-slate-400 mt-2 font-medium italic">Completed transactions</p>
+              </div>
+
+              <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center border border-purple-100/50">
+                    <Users className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Suppliers</p>
+                <p className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">{suppliers.length}</p>
+                <p className="text-xs text-slate-400 mt-2 font-medium italic">Unique distributors</p>
+              </div>
+
+              <div
+                onClick={generateSpecialOrderReport}
+                className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 cursor-pointer hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-900/[0.03] transition-all duration-300 group"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center border border-indigo-100/50 group-hover:bg-indigo-600 group-hover:border-indigo-600 transition-all duration-300">
+                    <ClipboardList className="w-6 h-6 text-indigo-600 group-hover:text-white transition-all duration-300" />
+                  </div>
+                  <div className="px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full opacity-0 group-hover:opacity-100 transition-opacity">EXPORT XLS</div>
+                </div>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest group-hover:text-indigo-700 transition-colors">Special Orders</p>
+                <p className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">
+                  {Object.values(allCustomerLists).reduce((acc, list) => acc + list.length, 0)}
+                </p>
+                <p className="text-xs text-slate-400 mt-2 font-medium italic">Active requests</p>
               </div>
             </div>
 
-            <div
-              onClick={generateOrderReport}
-              className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 cursor-pointer hover:border-rose-300 hover:shadow-xl transition-all group"
-              title="Click to export all orders to Excel"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-sm font-medium group-hover:text-rose-600 transition-colors">Total Orders</p>
-                  <p className="text-3xl font-bold text-slate-800 mt-1">{orders.length}</p>
+            {/* Product Catalog - Admin View with Pricing */}
+            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 mb-10 overflow-hidden">
+              <div
+                className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                onClick={() => toggleSection('catalog')}
+              >
+                <div className="flex items-center">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.catalog ? 'bg-slate-100' : 'bg-rose-50'}`}>
+                    {collapsedSections.catalog ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-rose-600" />}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Active Catalog</h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Inventory & Pricing Management</p>
+                  </div>
                 </div>
-                <ShoppingCart className="w-12 h-12 text-green-500 opacity-20 group-hover:opacity-40 transition-opacity" />
-              </div>
-            </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-600 text-sm font-medium">Suppliers</p>
-                  <p className="text-3xl font-bold text-slate-800 mt-1">{suppliers.length}</p>
-                </div>
-                <Users className="w-12 h-12 text-purple-500 opacity-20" />
-              </div>
-            </div>
-          </div>
-
-          {/* Product Catalog - Admin View with Pricing */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div
-              className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('catalog')}
-            >
-              <div className="flex items-center">
-                {collapsedSections.catalog ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-                <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                  <Package className="w-6 h-6 mr-2 text-rose-600" />
-                  Product Catalog (Admin View)
-                </h2>
+                {!collapsedSections.catalog && (
+                  <div className="relative w-full md:w-96" onClick={(e) => e.stopPropagation()}>
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Search by producer, name, or vintage..."
+                      className="w-full pl-11 pr-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all duration-200 placeholder:text-slate-400 font-medium"
+                    />
+                  </div>
+                )}
               </div>
 
               {!collapsedSections.catalog && (
-                <div className="relative w-full md:w-96" onClick={(e) => e.stopPropagation()}>
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search products..."
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all"
-                  />
+                <div className="animate-in fade-in duration-500">
+                  {filteredProducts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-slate-50/30 rounded-2xl border border-dashed border-slate-200">
+                      <Search className="w-12 h-12 text-slate-300 mb-4" />
+                      <p className="text-slate-500 font-medium">
+                        {products.length === 0 ? 'No products in catalog yet.' : `No results found for "${searchTerm}"`}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto -mx-8">
+                      <table className="w-full whitespace-nowrap">
+                        <thead>
+                          <tr className="bg-slate-50/50 border-y border-slate-100">
+                            <th className="text-left py-4 px-8 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Code</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Producer</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Product Info</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Vintage</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Format/Pack</th>
+                            <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Type</th>
+                            <th className="text-right py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">FOB Case</th>
+                            <th className="text-right py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Btl Price</th>
+                            <th className="text-right py-4 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Case Price</th>
+                            <th className="text-center py-4 px-8 text-[10px] font-bold text-slate-500 uppercase tracking-[0.1em]">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {filteredProducts.map((product, idx) => {
+                            const calc = calculateFrontlinePrice(product);
+                            const frontlineCase = (parseFloat(calc.frontlinePrice) * parseInt(product.packSize || 12)).toFixed(2);
+
+                            return (
+                              <tr key={product.id} className="group hover:bg-slate-50/70 transition-colors">
+                                <td className="py-5 px-8">
+                                  <span className="text-xs font-bold text-slate-400 bg-slate-100/50 px-2 py-1 rounded-md">{product.itemCode}</span>
+                                </td>
+                                <td className="py-5 px-4">
+                                  <p className="text-sm font-bold text-slate-900 leading-tight">{product.producer}</p>
+                                  <p className="text-[10px] text-slate-400 font-medium uppercase mt-1">{product.supplier}</p>
+                                </td>
+                                <td className="py-5 px-4 text-sm font-medium text-slate-700">{product.productName}</td>
+                                <td className="py-5 px-4 text-sm font-bold text-slate-500 tracking-tight">{product.vintage || 'NV'}</td>
+                                <td className="py-5 px-4">
+                                  <div className="text-xs font-medium text-slate-600">
+                                    {product.bottleSize} <span className="text-slate-300 mx-1">•</span> {product.packSize}pk
+                                  </div>
+                                </td>
+                                <td className="py-5 px-4">
+                                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${calc.formulaUsed === 'wine' ? 'bg-purple-50 text-purple-700' :
+                                    calc.formulaUsed === 'spirits' ? 'bg-amber-50 text-amber-700' :
+                                      'bg-blue-50 text-blue-700'
+                                    }`}>
+                                    {calc.formulaUsed}
+                                  </span>
+                                </td>
+                                <td className="py-5 px-4 text-right">
+                                  <span className="text-sm font-bold text-slate-800 tracking-tight">${product.fobCasePrice.toFixed(2)}</span>
+                                </td>
+                                <td className="py-5 px-4 text-right">
+                                  <span className="text-sm font-extrabold text-rose-600 tracking-tight">${calc.frontlinePrice}</span>
+                                </td>
+                                <td className="py-5 px-4 text-right">
+                                  <span className="text-sm font-extrabold text-slate-900 tracking-tight">${frontlineCase}</span>
+                                </td>
+                                <td className="py-5 px-8">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <button
+                                      onClick={() => setEditingProduct(product)}
+                                      className="p-2 text-slate-400 hover:text-slate-900 hover:bg-white rounded-lg transition-all border border-transparent hover:border-slate-200 group/btn"
+                                      title="Edit Product"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeleteConfirmation({ id: product.id, name: `${product.producer} - ${product.productName}`, type: 'product' })}
+                                      className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all border border-transparent hover:border-rose-100 group/btn"
+                                      title="Delete Product"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {!collapsedSections.catalog && (
-              <>
+            {/* Customer Special Order Lists */}
+            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 mb-10 overflow-hidden">
+              <div
+                className="flex items-center mb-8 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                onClick={() => toggleSection('customerLists')}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.customerLists ? 'bg-slate-100' : 'bg-rose-50'}`}>
+                  {collapsedSections.customerLists ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-rose-600" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Active Customer Lists</h2>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Special order requests by establishment</p>
+                </div>
+              </div>
 
-                {filteredProducts.length === 0 ? (
-                  <p className="text-slate-500 text-center py-8">
-                    {products.length === 0 ? 'No products in catalog' : 'No products match your search'}
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 border-b-2 border-slate-200">
-                        <tr>
-                          <th className="text-left p-3 font-semibold text-slate-700">Code</th>
-                          <th className="text-left p-3 font-semibold text-slate-700">Producer</th>
-                          <th className="text-left p-3 font-semibold text-slate-700">Product</th>
-                          <th className="text-left p-3 font-semibold text-slate-700">Vintage</th>
-                          <th className="text-left p-3 font-semibold text-slate-700">Size</th>
-                          <th className="text-left p-3 font-semibold text-slate-700">Pack</th>
-                          <th className="text-left p-3 font-semibold text-slate-700">Type</th>
-                          <th className="text-right p-3 font-semibold text-slate-700">FOB Case</th>
-                          <th className="text-right p-3 font-semibold text-slate-700">Frontline Btl</th>
-                          <th className="text-right p-3 font-semibold text-slate-700">Frontline Case</th>
-                          <th className="text-left p-3 font-semibold text-slate-700">Supplier</th>
-                          <th className="text-center p-3 font-semibold text-slate-700">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredProducts.map((product, idx) => {
-                          const calc = calculateFrontlinePrice(product);
-                          const frontlineCase = (parseFloat(calc.frontlinePrice) * parseInt(product.packSize || 12)).toFixed(2);
-
+              {!collapsedSections.customerLists && (
+                <div className="animate-in fade-in duration-500">
+                  {Object.keys(allCustomerLists).filter(user => allCustomerLists[user].length > 0).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 bg-slate-50/30 rounded-2xl border border-dashed border-slate-200">
+                      <ClipboardList className="w-12 h-12 text-slate-300 mb-4" />
+                      <p className="text-slate-500 font-medium tracking-tight">No active customer lists currently.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {Object.entries(allCustomerLists)
+                        .filter(([_, items]) => items.length > 0)
+                        .map(([username, items]) => {
+                          const total = items.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2);
                           return (
-                            <tr key={product.id} className={`border-b border-slate-100 hover:bg-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                              <td className="p-3 text-slate-500 font-mono text-xs">{product.itemCode}</td>
-                              <td className="p-3 text-slate-800">{product.producer}</td>
-                              <td className="p-3 text-slate-700">{product.productName}</td>
-                              <td className="p-3 text-slate-600">{product.vintage || 'NV'}</td>
-                              <td className="p-3 text-slate-600">{product.bottleSize}</td>
-                              <td className="p-3 text-slate-600">{product.packSize}</td>
-                              <td className="p-3">
-                                <span className={`text-xs px-2 py-1 rounded ${calc.formulaUsed === 'wine' ? 'bg-purple-100 text-purple-700' :
-                                  calc.formulaUsed === 'spirits' ? 'bg-amber-100 text-amber-700' :
-                                    'bg-blue-100 text-blue-700'
-                                  }`}>
-                                  {calc.formulaUsed}
-                                </span>
-                              </td>
-                              <td className="p-3 text-right font-semibold text-slate-800">${product.fobCasePrice.toFixed(2)}</td>
-                              <td className="p-3 text-right font-semibold text-rose-600">${calc.frontlinePrice}</td>
-                              <td className="p-3 text-right font-bold text-rose-700">${frontlineCase}</td>
-                              <td className="p-3 text-slate-500 text-xs">{product.supplier}</td>
-                              <td className="p-3">
-                                <div className="flex items-center justify-center space-x-2">
-                                  <button
-                                    onClick={() => setEditingProduct(product)}
-                                    className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                                    title="Edit Product"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => setDeleteConfirmation({ id: product.id, name: `${product.producer} - ${product.productName}`, type: 'product' })}
-                                    className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                                    title="Delete Product"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                            <div
+                              key={username}
+                              className="bg-white border border-slate-100 rounded-3xl p-6 hover:border-rose-200 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-300 cursor-pointer group flex flex-col justify-between"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCustomerForList(username);
+                                setSpecialOrderList(items);
+                                setShowList(true);
+                              }}
+                            >
+                              <div className="flex justify-between items-start mb-4">
+                                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 group-hover:bg-rose-50 group-hover:border-rose-100 transition-colors duration-300">
+                                  <UserCheck className="w-5 h-5 text-slate-400 group-hover:text-rose-600 transition-colors duration-300" />
                                 </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Customer Special Order Lists */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div
-              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('customerLists')}
-            >
-              {collapsedSections.customerLists ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <ClipboardList className="w-6 h-6 mr-2 text-rose-600" />
-                Customer Special Order Lists
-              </h2>
-            </div>
-
-            {!collapsedSections.customerLists && (
-              <>
-                {Object.keys(allCustomerLists).filter(user => allCustomerLists[user].length > 0).length === 0 ? (
-                  <p className="text-slate-500 text-center py-8">No active customer lists</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Object.entries(allCustomerLists)
-                      .filter(([_, items]) => items.length > 0)
-                      .map(([username, items]) => {
-                        const total = items.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2);
-                        return (
-                          <div
-                            key={username}
-                            className="border border-slate-200 rounded-lg p-4 hover:border-rose-300 hover:shadow-md transition-all cursor-pointer group"
-                            onClick={() => {
-                              setSelectedCustomerForList(username);
-                              setSpecialOrderList(items);
-                              setShowList(true);
-                            }}
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <h3 className="font-bold text-slate-800 group-hover:text-rose-600 transition-colors uppercase flex items-center">
-                                  <UserCheck className="w-4 h-4 mr-1.5 text-slate-400" />
-                                  {username}
-                                </h3>
-                                <p className="text-xs text-slate-500">{items.length} item(s) on list</p>
+                                <div className="text-right">
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Estimated Total</p>
+                                  <p className="text-xl font-extrabold text-slate-900 tracking-tight group-hover:text-rose-600 transition-colors font-mono">${total}</p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-rose-600">${total}</p>
+
+                              <div>
+                                <h3 className="font-extrabold text-slate-900 truncate uppercase tracking-tight text-lg mb-1">{username}</h3>
+                                <p className="text-xs text-slate-500 font-medium">{items.length} item(s) pending request</p>
+                              </div>
+
+                              <div className="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all duration-300 transform -translate-x-2 group-hover:translate-x-0 font-sans">View Full List</span>
+                                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-rose-600 transition-colors" />
                               </div>
                             </div>
-                            <div className="mt-3 flex justify-end text-xs font-semibold text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                              View & Edit List →
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Recent Orders */}
+            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 mb-10 overflow-hidden text-slate-800">
+              <div
+                className="flex items-center mb-8 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                onClick={() => toggleSection('orders')}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.orders ? 'bg-slate-100' : 'bg-rose-50'}`}>
+                  {collapsedSections.orders ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-rose-600" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Order Archive</h2>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Historical snapshot of submitted lists</p>
+                </div>
+              </div>
+
+              {!collapsedSections.orders && (
+                <div className="animate-in fade-in duration-500">
+                  {orders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 bg-slate-50/30 rounded-2xl border border-dashed border-slate-200">
+                      <ShoppingCart className="w-12 h-12 text-slate-300 mb-4" />
+                      <p className="text-slate-500 font-medium tracking-tight">No historical orders found.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {orders.slice().reverse().map(order => {
+                        const hasDiscontinued = order.items.some(item =>
+                          discontinuedProducts.find(d => d.id === item.id)
+                        );
+
+                        return (
+                          <div key={order.id} className="bg-white border border-slate-100 rounded-3xl p-6 hover:shadow-[0_8px_30px_rgb(0,0,0,0.03)] transition-all duration-300">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100 uppercase font-extrabold text-slate-400 text-xs shadow-sm">
+                                  {order.customer?.substring(0, 2) || '??'}
+                                </div>
+                                <div>
+                                  <p className="font-extrabold text-slate-900 text-lg tracking-tight uppercase font-sans">{order.customer || 'Unknown Customer'}</p>
+                                  <div className="flex items-center space-x-2 mt-0.5">
+                                    <p className="text-xs text-slate-400 font-bold tracking-wider">{new Date(order.date).toLocaleDateString()}</p>
+                                    {hasDiscontinued && (
+                                      <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-bold border border-amber-100 uppercase tracking-tighter">Legacy Items</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col md:items-end w-full md:w-auto">
+                                <p className="text-2xl font-extrabold text-slate-900 tracking-tighter mb-2 font-mono">${order.total}</p>
+                                <div className="relative inline-block">
+                                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                                  <select
+                                    value={order.status}
+                                    onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                                    className={`appearance-none pl-4 pr-10 py-1.5 text-[10px] rounded-full font-bold uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-rose-500/10 border transition-all cursor-pointer ${order.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                      order.status === 'cancelled' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                        order.status === 'confirmed' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                          'bg-amber-50 text-amber-700 border-amber-100'
+                                      }`}
+                                  >
+                                    <option value="pending">pending</option>
+                                    <option value="confirmed">confirmed</option>
+                                    <option value="shipped">shipped</option>
+                                    <option value="delivered">delivered</option>
+                                    <option value="completed">completed</option>
+                                    <option value="cancelled">cancelled</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-50">
+                              <details className="group/details">
+                                <summary className="cursor-pointer text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-[0.15em] flex items-center list-none select-none outline-none">
+                                  <ChevronRight className="w-3 h-3 mr-1 transition-transform group-open/details:rotate-90" />
+                                  View Inventory Snapshot ({order.items.length} items)
+                                </summary>
+                                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/30">
+                                  <table className="w-full text-xs">
+                                    <tbody className="divide-y divide-slate-100">
+                                      {order.items.map((item, idx) => {
+                                        const isDiscontinued = discontinuedProducts.find(d => d.id === item.id);
+                                        return (
+                                          <tr key={idx} className="hover:bg-white transition-colors">
+                                            <td className="py-3 px-4 flex items-center space-x-2">
+                                              {isDiscontinued && <span className="w-1.5 h-1.5 bg-amber-400 rounded-full" title="Discontinued"></span>}
+                                              <span className={`font-bold ${isDiscontinued ? 'text-amber-800' : 'text-slate-700'}`}>{item.producer}</span>
+                                            </td>
+                                            <td className="py-3 px-4 text-slate-500 font-medium italic">{item.productName}</td>
+                                            <td className="py-3 px-4 text-right">
+                                              <span className="font-bold text-slate-900 bg-white shadow-sm border border-slate-100 px-2 py-0.5 rounded-md">×{item.quantity}</span>
+                                            </td>
+                                            <td className="py-3 px-4 text-right font-bold text-slate-600 font-mono">${(parseFloat(item.frontlinePrice) * item.quantity).toFixed(2)}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </details>
                             </div>
                           </div>
                         );
                       })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Recent Orders */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div
-              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('orders')}
-            >
-              {collapsedSections.orders ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <ShoppingCart className="w-6 h-6 mr-2 text-rose-600" />
-                Recent Orders
-              </h2>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {!collapsedSections.orders && (
-              <>
+            {/* Discontinued Products (In Active Orders) */}
+            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 mb-10 overflow-hidden">
+              <div
+                className="flex items-center mb-4 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                onClick={() => toggleSection('discontinued')}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.discontinued ? 'bg-slate-100' : 'bg-rose-50'}`}>
+                  {collapsedSections.discontinued ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-rose-600" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Legacy Inventory</h2>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Discontinued products with active commitments</p>
+                </div>
+              </div>
 
-                {orders.length === 0 ? (
-                  <p className="text-slate-500 text-center py-8">No orders yet</p>
-                ) : (
-                  <div className="space-y-4">
-                    {orders.slice().reverse().map(order => {
-                      // Check if any items are discontinued
-                      const hasDiscontinued = order.items.some(item =>
-                        discontinuedProducts.find(d => d.id === item.id)
-                      );
-
-                      return (
-                        <div key={order.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex justify-between items-start mb-2">
+              {!collapsedSections.discontinued && (
+                <div className="animate-in fade-in duration-500">
+                  {discontinuedProducts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 bg-slate-50/30 rounded-2xl border border-dashed border-slate-200">
+                      <p className="text-slate-400 text-sm font-medium">No active commitments to legacy inventory.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                      {discontinuedProducts.map(product => (
+                        <div key={product.id} className="bg-amber-50/30 border border-amber-100 rounded-2xl p-6 hover:bg-amber-50 group transition-all duration-300">
+                          <div className="flex justify-between items-start">
                             <div>
-                              <p className="font-semibold text-slate-800">{order.customer}</p>
-                              <p className="text-sm text-slate-500">{new Date(order.date).toLocaleDateString()}</p>
-                              {hasDiscontinued && (
-                                <p className="text-xs text-amber-600 mt-1">⚠ Contains discontinued items</p>
-                              )}
+                              <p className="font-extrabold text-slate-900 text-sm tracking-tight uppercase group-hover:text-amber-800 transition-colors">{product.producer}</p>
+                              <p className="text-sm text-slate-500 font-medium mt-0.5">{product.productName}</p>
+                              <div className="flex items-center space-x-3 mt-4">
+                                <span className="text-[10px] font-bold text-amber-600 bg-white border border-amber-100 px-2 py-0.5 rounded-full">{product.vintage || 'NV'}</span>
+                                <span className="text-[10px] font-bold text-slate-400">{product.supplier}</span>
+                              </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-lg font-bold text-rose-600">${order.total}</p>
-                              <select
-                                value={order.status}
-                                onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                                className={`mt-1 px-3 py-1 text-xs rounded-full font-semibold focus:outline-none focus:ring-1 focus:ring-rose-500 cursor-pointer ${order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                  order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                    order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                                      'bg-yellow-100 text-yellow-800'
-                                  }`}
-                              >
-                                <option value="pending">pending</option>
-                                <option value="confirmed">confirmed</option>
-                                <option value="shipped">shipped</option>
-                                <option value="delivered">delivered</option>
-                                <option value="completed">completed</option>
-                                <option value="cancelled">cancelled</option>
-                              </select>
+                              <p className="text-xl font-black text-amber-700 tracking-tighter">${product.frontlinePrice}</p>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Final Pricing</p>
                             </div>
                           </div>
-                          <div className="text-sm text-slate-600">
-                            {order.items.length} item(s)
-                            <details className="mt-2">
-                              <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-700">View items</summary>
-                              <div className="mt-2 space-y-1">
-                                {order.items.map((item, idx) => {
-                                  const isDiscontinued = discontinuedProducts.find(d => d.id === item.id);
-                                  return (
-                                    <div key={idx} className={`text-xs pl-2 ${isDiscontinued ? 'text-amber-700' : 'text-slate-600'}`}>
-                                      {isDiscontinued && '⚠ '}{item.producer} - {item.productName} (×{item.quantity})
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </details>
-                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Discontinued Products (In Active Orders) */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div
-              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('discontinued')}
-            >
-              {collapsedSections.discontinued ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <Package className="w-6 h-6 mr-2 text-rose-600" />
-                Discontinued Products (In Active Orders)
-              </h2>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {!collapsedSections.discontinued && (
-              <>
+            {/* Pricing Formulas (AOC) */}
+            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 mb-10 overflow-hidden">
+              <div
+                className="flex items-center mb-8 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                onClick={() => toggleSection('formulas')}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.formulas ? 'bg-slate-100' : 'bg-rose-50'}`}>
+                  {collapsedSections.formulas ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-rose-600" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Calculation Engine</h2>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Pricing algorithms & tax configuration</p>
+                </div>
+              </div>
 
-                {discontinuedProducts.length === 0 ? (
-                  <p className="text-slate-500 text-center py-8">No discontinued products with active orders</p>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {discontinuedProducts.map(product => (
-                      <div key={product.id} className="border border-amber-200 bg-amber-50 rounded-lg p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-semibold text-slate-800">{product.producer} - {product.productName}</p>
-                            <p className="text-sm text-slate-600">{product.vintage || 'NV'} | {product.bottleSize} | {product.supplier}</p>
-                            <p className="text-xs text-amber-700 mt-1">
-                              Discontinued: {new Date(product.discontinuedDate).toLocaleDateString()}
-                            </p>
+              {!collapsedSections.formulas && (
+                <div className="animate-in fade-in duration-500">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {Object.entries(formulas).map(([type, formula]) => (
+                      <div key={type} className="bg-slate-50/50 border border-slate-100 rounded-3xl p-6 hover:bg-white hover:border-rose-100 hover:shadow-sm transition-all duration-300">
+                        <h3 className="text-sm font-extrabold text-slate-900 mb-6 uppercase tracking-[0.15em] flex items-center">
+                          <span className="w-1.5 h-1.5 bg-rose-500 rounded-full mr-2"></span>
+                          {type}
+                        </h3>
+                        <div className="space-y-5">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tax per Liter ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formula.taxPerLiter}
+                              onChange={(e) => {
+                                const newFormulas = {
+                                  ...formulas,
+                                  [type]: { ...formula, taxPerLiter: parseFloat(e.target.value) || 0 }
+                                };
+                                saveFormulas(newFormulas);
+                              }}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono text-sm"
+                            />
                           </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-slate-700">${product.frontlinePrice}</p>
-                            <p className="text-xs text-slate-500">per bottle</p>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Fixed Tax ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formula.taxFixed}
+                              onChange={(e) => {
+                                const newFormulas = {
+                                  ...formulas,
+                                  [type]: { ...formula, taxFixed: parseFloat(e.target.value) || 0 }
+                                };
+                                saveFormulas(newFormulas);
+                              }}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Shipping / Case ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formula.shippingPerCase}
+                              onChange={(e) => {
+                                const newFormulas = {
+                                  ...formulas,
+                                  [type]: { ...formula, shippingPerCase: parseFloat(e.target.value) || 0 }
+                                };
+                                saveFormulas(newFormulas);
+                              }}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Margin Divisor</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formula.marginDivisor}
+                              onChange={(e) => {
+                                const newFormulas = {
+                                  ...formulas,
+                                  [type]: { ...formula, marginDivisor: parseFloat(e.target.value) || 0.65 }
+                                };
+                                saveFormulas(newFormulas);
+                              }}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">SRP Multiplier</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formula.srpMultiplier}
+                              onChange={(e) => {
+                                const newFormulas = {
+                                  ...formulas,
+                                  [type]: { ...formula, srpMultiplier: parseFloat(e.target.value) || 1.47 }
+                                };
+                                saveFormulas(newFormulas);
+                              }}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono text-sm"
+                            />
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </>
-            )}
-          </div>
 
-          {/* Pricing Formulas (AOC) */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div
-              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('formulas')}
-            >
-              {collapsedSections.formulas ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <Settings className="w-6 h-6 mr-2 text-rose-600" />
-                Pricing Formulas (AOC)
-              </h2>
+                  <div className="mt-10 p-6 bg-slate-50 rounded-3xl border border-slate-100 flex items-start space-x-4">
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 shrink-0 shadow-sm border border-slate-200">
+                      <ClipboardList className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-extrabold text-slate-900 uppercase tracking-widest text-[10px] mb-2">Algorithm Logic (Vinosmith Standard)</p>
+                      <ol className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 text-[11px] font-medium text-slate-500 italic">
+                        <li>1. Case Volume = (Pack × Size ML) ÷ 1000</li>
+                        <li>2. Combined Tax = (Volume × Tax/L) + Flat Tax</li>
+                        <li>3. Laid In Cost = FOB + Delivery + Tax</li>
+                        <li>4. Whls Net = Laid In ÷ Margin Divisor</li>
+                        <li>5. SRP = ROUNDUP(Unit Net × SRP Mult, 0) - .01</li>
+                        <li>6. Frontline = SRP ÷ SRP Mult</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {!collapsedSections.formulas && (
-              <>
+            {/* Supplier and Upload Management */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+              {/* Supplier Management */}
+              <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col h-full">
+                <div
+                  className="flex items-center mb-8 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                  onClick={() => toggleSection('suppliers')}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.suppliers ? 'bg-slate-100' : 'bg-rose-50'}`}>
+                    {collapsedSections.suppliers ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-rose-600" />}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Suppliers</h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Distributor network management</p>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {Object.entries(formulas).map(([type, formula]) => (
-                    <div key={type} className="border border-slate-200 rounded-lg p-4">
-                      <h3 className="font-semibold text-slate-700 mb-3 capitalize">{type}</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-sm text-slate-600">Tax per Liter ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formula.taxPerLiter}
-                            onChange={(e) => {
-                              const newFormulas = {
-                                ...formulas,
-                                [type]: { ...formula, taxPerLiter: parseFloat(e.target.value) || 0 }
-                              };
-                              saveFormulas(newFormulas);
-                            }}
-                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-slate-600">Fixed Tax ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formula.taxFixed}
-                            onChange={(e) => {
-                              const newFormulas = {
-                                ...formulas,
-                                [type]: { ...formula, taxFixed: parseFloat(e.target.value) || 0 }
-                              };
-                              saveFormulas(newFormulas);
-                            }}
-                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-slate-600">Shipping per Case ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formula.shippingPerCase}
-                            onChange={(e) => {
-                              const newFormulas = {
-                                ...formulas,
-                                [type]: { ...formula, shippingPerCase: parseFloat(e.target.value) || 0 }
-                              };
-                              saveFormulas(newFormulas);
-                            }}
-                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-slate-600">Margin Divisor</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formula.marginDivisor}
-                            onChange={(e) => {
-                              const newFormulas = {
-                                ...formulas,
-                                [type]: { ...formula, marginDivisor: parseFloat(e.target.value) || 0.65 }
-                              };
-                              saveFormulas(newFormulas);
-                            }}
-                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm text-slate-600">SRP Multiplier</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={formula.srpMultiplier}
-                            onChange={(e) => {
-                              const newFormulas = {
-                                ...formulas,
-                                [type]: { ...formula, srpMultiplier: parseFloat(e.target.value) || 1.47 }
-                              };
-                              saveFormulas(newFormulas);
-                            }}
-                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                          />
+                {!collapsedSections.suppliers && (
+                  <div className="animate-in fade-in duration-500 overflow-y-auto max-h-[400px] flex-grow pr-2">
+                    {suppliers.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 bg-slate-50/30 rounded-2xl border border-dashed border-slate-200">
+                        <Users className="w-10 h-10 text-slate-300 mb-3" />
+                        <p className="text-slate-400 text-sm font-medium">No distributors mapped yet.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {suppliers.map(supplier => {
+                          const supplierProducts = products.filter(p => p.supplier === supplier);
+                          const latestUpload = supplierProducts.length > 0
+                            ? new Date(Math.max(...supplierProducts.map(p => new Date(p.uploadDate)))).toLocaleDateString()
+                            : 'Unknown';
+
+                          return (
+                            <div key={supplier} className="flex justify-between items-center p-5 bg-slate-50/30 rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all duration-200 group">
+                              <div>
+                                <p className="font-extrabold text-slate-800 text-sm tracking-tight uppercase">{supplier}</p>
+                                <div className="flex items-center space-x-3 mt-1.5">
+                                  <span className="text-[10px] font-bold text-slate-400 bg-white border border-slate-100 px-2 py-0.5 rounded-full">{supplierProducts.length} items</span>
+                                  <span className="text-[10px] font-bold text-slate-300">Updated: {latestUpload}</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  if (window.confirm(`Remove all items for ${supplier}? This cannot be undone.`)) {
+                                    const updatedProducts = products.filter(p => p.supplier !== supplier);
+                                    await saveProducts(updatedProducts);
+                                  }
+                                }}
+                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all border border-transparent hover:border-rose-100"
+                                title="Delete Supplier"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Section */}
+              <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col h-full">
+                <div
+                  className="flex items-center mb-8 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                  onClick={() => toggleSection('upload')}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.upload ? 'bg-slate-100' : 'bg-rose-50'}`}>
+                    {collapsedSections.upload ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-rose-600" />}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Import Engine</h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Process Excel or PDF price lists</p>
+                  </div>
+                </div>
+
+                {!collapsedSections.upload && (
+                  <div className="animate-in fade-in duration-500 flex flex-col items-center justify-center flex-grow py-8 border-2 border-dashed border-slate-200 rounded-3xl px-8 text-center hover:border-rose-300 hover:bg-rose-50/10 transition-all duration-300">
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-rose-100/50">
+                      <FileSpreadsheet className="w-8 h-8 text-rose-600" />
+                    </div>
+                    <h3 className="text-lg font-extrabold text-slate-900 tracking-tight mb-2">Drop List Here</h3>
+                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed mb-6 px-10">Supporting .xlsx, .xls, and PDF formats for automatic extraction</p>
+                    <button
+                      onClick={() => document.getElementById('file-upload')?.click()}
+                      className="w-full bg-[#1a1a1a] text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all duration-200 flex items-center justify-center space-x-3 active:scale-[0.98] shadow-lg shadow-slate-200"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>Select Local File</span>
+                    </button>
+
+                    {uploadStatus && (
+                      <div className={`mt-6 w-full p-4 rounded-2xl border text-[11px] font-bold uppercase tracking-tight ${uploadStatus.includes('Error') || uploadStatus.includes('failed')
+                        ? 'bg-rose-50 text-rose-700 border-rose-100'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        }`}>
+                        {uploadStatus}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Louis Dressner PDF Converter Section */}
+            <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 mb-10 overflow-hidden">
+              <div
+                className="flex items-center mb-6 cursor-pointer hover:bg-slate-50/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
+                onClick={() => toggleSection('dressner')}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.dressner ? 'bg-slate-100' : 'bg-purple-50'}`}>
+                  {collapsedSections.dressner ? <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600" /> : <ChevronDown className="w-5 h-5 text-purple-600" />}
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">External PDF Pipeline</h2>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5 group-hover:text-slate-700 transition-colors">Louis Dressner protocol converters</p>
+                </div>
+              </div>
+
+              {!collapsedSections.dressner && (
+                <div className="animate-in fade-in duration-500 space-y-8">
+                  <div className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl">
+                    <p className="text-xs text-indigo-700 font-medium leading-relaxed">
+                      <span className="font-bold">Automated Protocol:</span> For Louis Dressner source PDFs, use the satellite converters below to generate a compatible schema, then upload the resulting file to the primary dropzone.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-2xl p-6 border border-slate-100 hover:border-purple-200 hover:shadow-sm transition-all duration-300 group">
+                      <h3 className="text-sm font-extrabold text-slate-900 mb-2 flex items-center">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                        Desktop Satellite (macOS)
+                      </h3>
+                      <p className="text-[11px] text-slate-500 font-medium mb-6">Drop-target application for high-volume conversion</p>
+                      <a
+                        href="/api/placeholder/download/mac-app"
+                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-xl font-bold text-xs hover:bg-purple-600 hover:text-white transition-all duration-300 shadow-sm"
+                        download="louis_dressner_converter_mac.py"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Satellite App</span>
+                      </a>
+                    </div>
+
+                    <div className="bg-white rounded-2xl p-6 border border-slate-100 hover:border-purple-200 hover:shadow-sm transition-all duration-300 group">
+                      <h3 className="text-sm font-extrabold text-slate-900 mb-2 flex items-center">
+                        <div className="w-2 h-2 bg-slate-400 rounded-full mr-2"></div>
+                        Terminal CLI Utility
+                      </h3>
+                      <p className="text-[11px] text-slate-500 font-medium mb-4">Python-based command line interface</p>
+                      <code className="text-[10px] bg-slate-900 text-slate-300 p-3 rounded-xl block mb-6 font-mono leading-relaxed">
+                        python3 convert.py source.pdf output.xlsx
+                      </code>
+                      <a
+                        href="/api/placeholder/download/python-script"
+                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-xl font-bold text-xs hover:bg-slate-200 transition-all duration-300"
+                        download="convert_louis_dressner_pdf.py"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download CLI Source</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Column Mapping UI */}
+            {
+              pendingUpload && columnMapping && (
+                <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.1)] border border-slate-100 mb-12 animate-in zoom-in-95 duration-500">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                    <div>
+                      <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Initialize Schema</h2>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Mapping: {pendingUpload.file.name}</p>
+                    </div>
+                    {pendingUpload.hasTemplate && (
+                      <div className="flex items-center space-x-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Active Template Link</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Supplier Name Editor */}
+                  <div className="mb-10 p-8 bg-[#faf9f6] border border-slate-100 rounded-3xl">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 ml-1">
+                      Entity Identification
+                    </label>
+                    <input
+                      type="text"
+                      value={pendingUpload.supplierName}
+                      onChange={(e) => setPendingUpload({
+                        ...pendingUpload,
+                        supplierName: e.target.value
+                      })}
+                      placeholder="Source Entity Name (e.g. Rosenthal)"
+                      className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-rose-500/5 focus:border-rose-500 transition-all font-bold text-lg text-slate-900"
+                    />
+                    <p className="text-[10px] text-slate-400 font-medium mt-3 ml-1 italic">
+                      Establish a unique distributor identifier for cross-catalog synchronization.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                    {Object.entries(columnMapping).map(([field, colIndex]) => (
+                      <div key={field} className="bg-white border border-slate-100 rounded-2xl p-5 hover:border-rose-100 hover:shadow-sm transition-all duration-300">
+                        <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">
+                          {field.replace(/([A-Z])/g, ' $1').trim()}
+                        </label>
+                        <div className="relative">
+                          <select
+                            value={colIndex}
+                            onChange={(e) => setColumnMapping({
+                              ...columnMapping,
+                              [field]: parseInt(e.target.value)
+                            })}
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-bold text-xs appearance-none cursor-pointer text-slate-700"
+                          >
+                            <option value="-1">NULL (UNMAPPED)</option>
+                            {pendingUpload.headers.map((header, idx) => (
+                              <option key={idx} value={idx}>
+                                COL {idx + 1}: {header || '(VOID)'}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                         </div>
                       </div>
+                    ))}
+                  </div>
+
+                  {/* Preview Section */}
+                  <div className="mb-10 border-t border-slate-50 pt-10">
+                    <h3 className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-6 flex items-center">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full mr-2"></span>
+                      Schema Data Preview
+                    </h3>
+                    <div className="overflow-x-auto rounded-3xl border border-slate-100 bg-slate-50/30">
+                      <table className="w-full text-[10px]">
+                        <thead>
+                          <tr className="bg-slate-100/50">
+                            <th className="text-left p-4 font-black text-slate-500 uppercase tracking-widest">Producer</th>
+                            <th className="text-left p-4 font-black text-slate-500 uppercase tracking-widest">Product</th>
+                            <th className="text-left p-4 font-black text-slate-500 uppercase tracking-widest">Vintage</th>
+                            <th className="text-left p-4 font-black text-slate-500 uppercase tracking-widest">Size</th>
+                            <th className="text-left p-4 font-black text-slate-500 uppercase tracking-widest">Pack</th>
+                            <th className="text-right p-4 font-black text-slate-500 uppercase tracking-widest">FOB</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white">
+                          {pendingUpload.data.slice(1, 6).map((row, idx) => (
+                            <tr key={idx} className="hover:bg-white transition-colors">
+                              <td className="p-4 font-bold text-slate-900">{columnMapping.producer >= 0 ? row[columnMapping.producer] : '-'}</td>
+                              <td className="p-4 font-medium text-slate-600">{columnMapping.productName >= 0 ? row[columnMapping.productName] : '-'}</td>
+                              <td className="p-4 font-black text-slate-400">{columnMapping.vintage >= 0 ? row[columnMapping.vintage] : '-'}</td>
+                              <td className="p-4 font-medium text-slate-400">{columnMapping.bottleSize >= 0 ? row[columnMapping.bottleSize] : '-'}</td>
+                              <td className="p-4 font-bold text-slate-400">{columnMapping.packSize >= 0 ? row[columnMapping.packSize] : '-'}</td>
+                              <td className="p-4 text-right font-black text-rose-600">{columnMapping.fobCasePrice >= 0 ? `$${row[columnMapping.fobCasePrice]}` : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 p-4 bg-slate-50 rounded-lg text-sm text-slate-600">
-                  <p className="font-semibold mb-2">Formula Logic:</p>
-                  <ol className="list-decimal list-inside space-y-1">
-                    <li>Case Size (L) = (Bottles/Case × Bottle Size ML) ÷ 1000</li>
-                    <li>Tax = (Case Size L × Tax/Liter) + Fixed Tax</li>
-                    <li>Laid In = FOB + Shipping + Tax</li>
-                    <li>Wholesale Case = Laid In ÷ {formulas.wine.marginDivisor}</li>
-                    <li>Wholesale Bottle = Wholesale Case ÷ Bottles/Case</li>
-                    <li>SRP = ROUNDUP(Wholesale Bottle × {formulas.wine.srpMultiplier}, 0) - $0.01</li>
-                    <li>Frontline Bottle = SRP ÷ {formulas.wine.srpMultiplier}</li>
-                  </ol>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Supplier Management */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div
-              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('suppliers')}
-            >
-              {collapsedSections.suppliers ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <Users className="w-6 h-6 mr-2 text-rose-600" />
-                Supplier Management
-              </h2>
-            </div>
-
-            {!collapsedSections.suppliers && (
-              <>
-
-                {suppliers.length === 0 ? (
-                  <p className="text-slate-500 text-center py-8">No suppliers yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {suppliers.map(supplier => {
-                      const supplierProducts = products.filter(p => p.supplier === supplier);
-                      const latestUpload = supplierProducts.length > 0
-                        ? new Date(Math.max(...supplierProducts.map(p => new Date(p.uploadDate)))).toLocaleDateString()
-                        : 'Unknown';
-
-                      return (
-                        <div key={supplier} className="border border-slate-200 rounded-lg p-4 flex justify-between items-center hover:shadow-md transition-shadow">
-                          <div>
-                            <p className="font-semibold text-slate-800">{supplier}</p>
-                            <p className="text-sm text-slate-600">{supplierProducts.length} products</p>
-                            <p className="text-xs text-slate-400">Last updated: {latestUpload}</p>
-                          </div>
-                          <button
-                            onClick={async () => {
-                              if (window.confirm(`Remove all products from ${supplier}? This cannot be undone.`)) {
-                                const updatedProducts = products.filter(p => p.supplier !== supplier);
-                                await saveProducts(updatedProducts);
-                              }
-                            }}
-                            className="px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors text-sm"
-                          >
-                            Remove Supplier
-                          </button>
-                        </div>
-                      );
-                    })}
                   </div>
-                )}
-              </>
-            )}
-          </div>
 
-          {/* Upload Section */}
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-            <div
-              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('upload')}
-            >
-              {collapsedSections.upload ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <Upload className="w-6 h-6 mr-2 text-rose-600" />
-                Upload Price List
-              </h2>
-            </div>
+                  <div className="flex space-x-4">
+                    <button
+                      onClick={confirmMapping}
+                      className="flex-1 bg-[#1a1a1a] text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-900 transition-all duration-300 shadow-xl shadow-slate-100 active:scale-[0.98]"
+                    >
+                      Commit Schema
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPendingUpload(null);
+                        setColumnMapping(null);
+                      }}
+                      className="flex-1 bg-slate-100 text-slate-500 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all duration-300"
+                    >
+                      Abort Import
+                    </button>
+                  </div>
+                </div>
+              )
+            }
 
-            {!collapsedSections.upload && (
-              <>
-
-                <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-rose-400 transition-colors">
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload"
-                    ref={(input) => { window.fileInput = input; }}
-                  />
-                  <FileSpreadsheet className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                  <p className="text-lg font-semibold text-slate-700 mb-4">Upload Price List</p>
-                  <p className="text-sm text-slate-500 mb-4">Supports Excel (.xlsx, .xls) and PDF formats</p>
-                  <button
-                    onClick={() => document.getElementById('file-upload')?.click()}
-                    className="px-6 py-3 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-semibold"
+            {/* Edit Product Modal */}
+            {editingProduct && (
+              <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="bg-white rounded-[2.5rem] shadow-[0_32px_128px_-16px_rgba(0,0,0,0.15)] max-w-2xl w-full max-h-[90vh] overflow-hidden border border-white/50 animate-in zoom-in-95 duration-300">
+                  <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-[#faf9f6]/50">
+                    <div>
+                      <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Modify Inventory</h2>
+                      <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Product Details & Core Data</p>
+                    </div>
+                    <button onClick={() => setEditingProduct(null)} className="p-3 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-100 shadow-sm">
+                      <X className="w-5 h-5 text-slate-400" />
+                    </button>
+                  </div>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleUpdateProduct(editingProduct);
+                    }}
+                    className="p-8 space-y-6 overflow-y-auto max-h-[calc(90vh-140px)]"
                   >
-                    Choose File
-                  </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Internal Item Code</label>
+                        <input
+                          type="text"
+                          value={editingProduct.itemCode}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, itemCode: e.target.value })}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-mono text-sm"
+                          placeholder="e.g. AOC-123"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Producer / Domain</label>
+                        <input
+                          type="text"
+                          value={editingProduct.producer}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, producer: e.target.value })}
+                          required
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-bold text-sm"
+                        />
+                      </div>
+                      <div className="md:col-span-2 space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Full Wine/Product Name</label>
+                        <input
+                          type="text"
+                          value={editingProduct.productName}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, productName: e.target.value })}
+                          required
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Vintage</label>
+                        <input
+                          type="text"
+                          value={editingProduct.vintage}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, vintage: e.target.value })}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-bold text-sm"
+                          placeholder="NV"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Classification</label>
+                        <select
+                          value={editingProduct.productType}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, productType: e.target.value })}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-bold text-sm appearance-none"
+                        >
+                          <option value="Wine">Wine</option>
+                          <option value="Spirits">Spirits</option>
+                          <option value="Non-Alcoholic">Non-Alcoholic</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Format (e.g. 750ml)</label>
+                        <input
+                          type="text"
+                          value={editingProduct.bottleSize}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, bottleSize: e.target.value })}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Case Pack</label>
+                        <input
+                          type="number"
+                          value={editingProduct.packSize}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, packSize: e.target.value })}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-bold text-sm"
+                        />
+                      </div>
+                      <div className="md:col-span-2 space-y-1.5 pt-4 bg-rose-50/30 p-6 rounded-[2rem] border border-rose-100/50">
+                        <label className="text-[10px] font-extrabold text-rose-600 uppercase tracking-widest ml-1">Cost (FOB Case Price $)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingProduct.fobCasePrice}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, fobCasePrice: parseFloat(e.target.value) || 0 })}
+                          required
+                          className="w-full px-6 py-4 bg-white border border-rose-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 transition-all font-mono text-xl font-extrabold text-rose-700"
+                        />
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-2 ml-1 italic">Frontline and SRP will be auto-recalculated by current engine rules.</p>
+                      </div>
+                    </div>
+                    <div className="pt-8 flex space-x-4">
+                      <button
+                        type="submit"
+                        className="flex-1 bg-[#1a1a1a] text-white py-4 rounded-2xl font-bold hover:bg-slate-900 transition-all duration-200 shadow-xl shadow-slate-200 active:scale-[0.98]"
+                      >
+                        Apply Changes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingProduct(null)}
+                        className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold hover:bg-slate-200 transition-all duration-200"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  </form>
                 </div>
+              </div>
+            )}
 
-                {uploadStatus && (
-                  <div className={`mt-4 p-4 rounded-lg ${uploadStatus.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                    {uploadStatus}
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmation && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-md w-full p-10 border border-slate-100 animate-in zoom-in-95 duration-300">
+                  <div className="w-20 h-20 bg-rose-50 rounded-3xl flex items-center justify-center mb-8 mx-auto border border-rose-100 shadow-sm">
+                    <Trash2 className="w-10 h-10 text-rose-600" />
                   </div>
-                )}
-              </>
+                  <div className="text-center mb-10">
+                    <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Confirm Deletion</h2>
+                    <p className="text-sm text-slate-500 mt-3 leading-relaxed font-medium">
+                      {deleteConfirmation.type === 'reset'
+                        ? 'This will permanently ERASE all products, orders, and configuration. This is a terminal action.'
+                        : `You are about to remove "${deleteConfirmation.name}". This cannot be reversed.`}
+                    </p>
+                  </div>
+                  <div className="flex flex-col space-y-3">
+                    <button
+                      onClick={async () => {
+                        if (deleteConfirmation.type === 'reset') {
+                          try {
+                            await window.storage.delete('wine-products');
+                            await window.storage.delete('wine-orders');
+                            await window.storage.delete('wine-discontinued');
+                            await window.storage.delete('wine-formulas');
+                            window.location.reload();
+                          } catch (e) {
+                            alert('Error resetting data');
+                          }
+                        } else {
+                          deleteProduct(deleteConfirmation.id);
+                        }
+                      }}
+                      id="confirm-delete-btn"
+                      className="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold hover:bg-rose-700 transition-all duration-200 shadow-lg shadow-rose-200 active:scale-[0.98]"
+                    >
+                      Confirm Deletion
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirmation(null)}
+                      className="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold hover:bg-slate-200 transition-all duration-200"
+                    >
+                      Keep Records
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-
-          {/* Louis Dressner PDF Converter Section */}
-          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 shadow-lg border-2 border-purple-200 mb-8">
-            <div
-              className="flex items-center mb-2 cursor-pointer hover:bg-purple-100/50 p-2 -m-2 rounded-lg transition-colors"
-              onClick={() => toggleSection('dressner')}
-            >
-              {collapsedSections.dressner ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
-              <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                <FileSpreadsheet className="w-6 h-6 mr-2 text-purple-600" />
-                Louis Dressner PDF Quick Converter
-              </h2>
-            </div>
-
-            {!collapsedSections.dressner && (
-              <>
-                <p className="text-sm text-slate-600 mb-4">
-                  For Louis Dressner PDFs: Use the Python script or Mac app below to convert, then upload the Excel file above. ↑
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white rounded-lg p-4 border border-purple-200">
-                    <h3 className="font-semibold text-slate-800 mb-2">📱 Mac App (Drag & Drop)</h3>
-                    <p className="text-xs text-slate-600 mb-3">Download and set up once, then just drag PDFs onto the app</p>
-                    <a
-                      href="/api/placeholder/download/mac-app"
-                      className="text-xs px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 inline-block"
-                      download="louis_dressner_converter_mac.py"
-                    >
-                      Download Mac App Files
-                    </a>
-                  </div>
-
-                  <div className="bg-white rounded-lg p-4 border border-purple-200">
-                    <h3 className="font-semibold text-slate-800 mb-2">🐍 Python Script (Command Line)</h3>
-                    <p className="text-xs text-slate-600 mb-2">Run from terminal:</p>
-                    <code className="text-xs bg-slate-100 p-2 rounded block mb-2">
-                      python3 convert.py input.pdf output.xlsx
-                    </code>
-                    <a
-                      href="/api/placeholder/download/python-script"
-                      className="text-xs px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 inline-block"
-                      download="convert_louis_dressner_pdf.py"
-                    >
-                      Download Python Script
-                    </a>
-                  </div>
+        </div>
+      ) : (
+        <div className="customer-view-transition-container">
+          <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50 px-8 py-5">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center border border-rose-100/50">
+                  <Wine className="w-6 h-6 text-rose-600" />
                 </div>
-
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs text-blue-800">
-                    <strong>💡 Quick Start:</strong> Download the files above → Follow MAC_INSTALLATION.md instructions →
-                    Convert your PDFs → Upload the resulting Excel files using the regular upload section above
-                  </p>
+                <div>
+                  <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">AOC Wines</h1>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Exclusive Partner Catalog</p>
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* Column Mapping UI */}
-          {
-            pendingUpload && columnMapping && (
-              <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-slate-800">
-                    Map Columns - {pendingUpload.file.name}
-                  </h2>
-                  {pendingUpload.hasTemplate && (
-                    <span className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full">
-                      ✓ Using saved template
+              </div>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => setShowList(!showList)}
+                  className="relative p-3 bg-white hover:bg-rose-50 rounded-2xl transition-all border border-slate-100 hover:border-rose-100 shadow-sm shadow-slate-100 group"
+                  title="View Collection"
+                >
+                  <ClipboardList className="w-6 h-6 text-slate-600 group-hover:text-rose-600 transition-colors" />
+                  {specialOrderList.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-[#1a1a1a] text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-md animate-in zoom-in-0 duration-300">
+                      {specialOrderList.length}
                     </span>
                   )}
-                </div>
-
-                {/* Supplier Name Editor */}
-                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
-                    Supplier Name
-                  </label>
-                  <input
-                    type="text"
-                    value={pendingUpload.supplierName}
-                    onChange={(e) => setPendingUpload({
-                      ...pendingUpload,
-                      supplierName: e.target.value
-                    })}
-                    placeholder="Enter supplier name (e.g., Rosenthal Wine Merchant)"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  />
-                  <p className="text-xs text-slate-600 mt-2">
-                    This name will be used to identify all products from this supplier.
-                    Clean supplier names help with organization and filtering.
-                  </p>
-                </div>
-
-                <p className="text-sm text-slate-600 mb-4">
-                  Please verify the column mapping below. Adjust any incorrect mappings before importing.
-                  {!pendingUpload.hasTemplate && " This mapping will be saved as a template for future uploads from this supplier."}
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {Object.entries(columnMapping).map(([field, colIndex]) => (
-                    <div key={field} className="border border-slate-200 rounded-lg p-3">
-                      <label className="block text-sm font-medium text-slate-700 mb-2 capitalize">
-                        {field.replace(/([A-Z])/g, ' $1').trim()}
-                      </label>
-                      <select
-                        value={colIndex}
-                        onChange={(e) => setColumnMapping({
-                          ...columnMapping,
-                          [field]: parseInt(e.target.value)
-                        })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                      >
-                        <option value="-1">-- Not mapped --</option>
-                        {pendingUpload.headers.map((header, idx) => (
-                          <option key={idx} value={idx}>
-                            Column {idx + 1}: {header || '(empty)'}
-                          </option>
-                        ))}
-                      </select>
-                      {colIndex >= 0 && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          Sample: {pendingUpload.data[1]?.[colIndex] || '(empty)'}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Preview Section */}
-                <div className="mb-6 border-t border-slate-200 pt-6">
-                  <h3 className="text-lg font-semibold text-slate-800 mb-3">Preview (First 5 Products)</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-slate-100">
-                        <tr>
-                          <th className="text-left p-2">Producer</th>
-                          <th className="text-left p-2">Product</th>
-                          <th className="text-left p-2">Vintage</th>
-                          <th className="text-left p-2">Size</th>
-                          <th className="text-left p-2">Pack</th>
-                          <th className="text-left p-2">Type</th>
-                          <th className="text-right p-2">FOB</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pendingUpload.data.slice(1, 6).map((row, idx) => (
-                          <tr key={idx} className="border-b border-slate-100">
-                            <td className="p-2">{columnMapping.producer >= 0 ? row[columnMapping.producer] : '-'}</td>
-                            <td className="p-2">{columnMapping.productName >= 0 ? row[columnMapping.productName] : '-'}</td>
-                            <td className="p-2">{columnMapping.vintage >= 0 ? row[columnMapping.vintage] : '-'}</td>
-                            <td className="p-2">{columnMapping.bottleSize >= 0 ? row[columnMapping.bottleSize] : '-'}</td>
-                            <td className="p-2">{columnMapping.packSize >= 0 ? row[columnMapping.packSize] : '-'}</td>
-                            <td className="p-2">{columnMapping.productType >= 0 ? row[columnMapping.productType] : '-'}</td>
-                            <td className="p-2 text-right">{columnMapping.fobCasePrice >= 0 ? `$${row[columnMapping.fobCasePrice]}` : '-'}</td>
-                            <td className="p-2">{columnMapping.productLink >= 0 ? (row[columnMapping.productLink] ? '✓' : '-') : '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                </button>
+                <div className="h-10 w-px bg-slate-100 mx-2 hidden md:block"></div>
+                <div className="flex items-center space-x-2 text-slate-600 pr-2">
+                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200/50">
+                    <UserCheck className="w-4 h-4 text-slate-500" />
                   </div>
+                  <span className="text-sm font-bold tracking-tight hidden md:block">{currentUser.username}</span>
                 </div>
-
-                <div className="flex space-x-4">
-                  <button
-                    onClick={confirmMapping}
-                    className="px-6 py-3 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg hover:from-rose-700 hover:to-rose-800 transition-all duration-200 shadow-lg"
-                  >
-                    Import Products
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPendingUpload(null);
-                      setColumnMapping(null);
-                    }}
-                    className="px-6 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )
-          }
-
-          {/* Edit Product Modal */}
-          {editingProduct && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                  <h2 className="text-xl font-bold text-slate-800">Edit Product</h2>
-                  <button onClick={() => setEditingProduct(null)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
-                    <X className="w-5 h-5 text-slate-500" />
-                  </button>
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleUpdateProduct(editingProduct);
-                  }}
-                  className="p-6 space-y-4"
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-all"
+                  title="Sign Out"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </nav>
+
+          <div className="max-w-7xl mx-auto p-8">
+            {/* Search and Discovery */}
+            <div className="bg-white rounded-[2rem] p-8 mb-10 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Search Collection</label>
+                  <div className="relative group">
+                    <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-rose-500 transition-colors" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Vintage, producer, or vineyard name..."
+                      className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-rose-500/5 focus:border-rose-500/50 transition-all placeholder:text-slate-300 font-medium"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Filter by Source</label>
+                  <div className="relative">
+                    <select
+                      value={selectedSupplier}
+                      onChange={(e) => setSelectedSupplier(e.target.value)}
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-rose-500/5 focus:border-rose-500/50 transition-all font-bold text-sm appearance-none cursor-pointer pr-12 text-slate-700"
+                    >
+                      <option value="all">All Direct Imports</option>
+                      {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+              {filteredProducts.map(product => {
+                const calc = calculateFrontlinePrice(product);
+                return (
+                  <div key={product.id} className="bg-white rounded-[2.5rem] p-10 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 hover:border-rose-100 hover:shadow-[0_12px_48px_-12px_rgba(225,29,72,0.08)] transition-all duration-500 group flex flex-col justify-between h-full">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Item Code</label>
-                      <input
-                        type="text"
-                        value={editingProduct.itemCode}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, itemCode: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                      />
+                      <div className="flex justify-between items-start mb-6">
+                        <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full uppercase tracking-wider">{product.productType || 'Wine'}</span>
+                        <span className="text-[11px] font-mono text-slate-300">{product.itemCode}</span>
+                      </div>
+                      <h3 className="font-extrabold text-2xl text-slate-900 tracking-tight leading-tight group-hover:text-rose-600 transition-colors uppercase">{product.producer}</h3>
+                      <p className="text-slate-500 font-medium mt-1 leading-relaxed">{product.productName}</p>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Producer</label>
-                      <input
-                        type="text"
-                        value={editingProduct.producer}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, producer: e.target.value })}
-                        required
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
-                      <input
-                        type="text"
-                        value={editingProduct.productName}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, productName: e.target.value })}
-                        required
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Vintage</label>
-                      <input
-                        type="text"
-                        value={editingProduct.vintage}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, vintage: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Product Type</label>
-                      <select
-                        value={editingProduct.productType}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, productType: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+
+                    <div className="mt-8 pt-6 border-t border-slate-50 flex flex-col gap-6">
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Estate Pricing</p>
+                          <div className="flex items-baseline space-x-1">
+                            <span className="text-3xl font-black text-slate-900 tracking-tighter">${calc.frontlinePrice}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">/ btl</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{product.packSize}pk • {product.bottleSize}</p>
+                          <p className="text-xs font-bold text-slate-400 tracking-wide uppercase">{product.vintage || 'NV'}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => addToList({ ...product, ...calc })}
+                        className="w-full bg-[#1a1a1a] text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all duration-300 flex items-center justify-center space-x-3 active:scale-[0.98] shadow-lg shadow-slate-200"
                       >
-                        <option value="Wine">Wine</option>
-                        <option value="Spirits">Spirits</option>
-                        <option value="Non-Alcoholic">Non-Alcoholic</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Bottle Size</label>
-                      <input
-                        type="text"
-                        value={editingProduct.bottleSize}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, bottleSize: e.target.value })}
-                        placeholder="e.g. 750ml"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Pack Size</label>
-                      <input
-                        type="number"
-                        value={editingProduct.packSize}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, packSize: e.target.value })}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">FOB Case Price ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editingProduct.fobCasePrice}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, fobCasePrice: parseFloat(e.target.value) || 0 })}
-                        required
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none font-bold text-lg"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Frontline and SRP prices will be recalculated based on formulas.</p>
+                        <Plus className="w-4 h-4" />
+                        <span>Reserve Allocation</span>
+                      </button>
                     </div>
                   </div>
-                  <div className="pt-6 border-t border-slate-100 flex space-x-3">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-rose-600 text-white py-3 rounded-xl font-bold hover:bg-rose-700 transition-colors shadow-lg"
-                    >
-                      Save Changes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingProduct(null)}
-                      className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Delete Confirmation Modal */}
-          {deleteConfirmation && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-                <div className="flex items-center text-red-600 mb-4">
-                  <Trash2 className="w-8 h-8 mr-3" />
-                  <h2 className="text-xl font-bold">Confirm Delete</h2>
-                </div>
-                <p className="text-slate-600 mb-6">
-                  {deleteConfirmation.type === 'reset'
-                    ? 'CRITICAL ACTION: This will permanently DELETE all products, orders, discontinued items, and reset all pricing formulas. This cannot be undone.'
-                    : `Are you sure you want to delete "${deleteConfirmation.name}"? This action cannot be undone.`}
-                </p>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={async () => {
-                      if (deleteConfirmation.type === 'reset') {
-                        try {
-                          await window.storage.delete('wine-products');
-                          await window.storage.delete('wine-orders');
-                          await window.storage.delete('wine-discontinued');
-                          await window.storage.delete('wine-formulas');
-                          window.location.reload();
-                        } catch (e) {
-                          alert('Error resetting data');
-                        }
-                      } else {
-                        deleteProduct(deleteConfirmation.id);
-                      }
-                    }}
-                    id="confirm-delete-btn"
-                    className="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg"
-                  >
-                    Yes, Delete
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirmation(null)}
-                    className="flex-1 bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div >
-    );
-  }
-
-  // Customer Catalog View
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-rose-50 to-purple-50">
-      <nav className="bg-white/80 backdrop-blur-sm border-b border-amber-200/50 px-6 py-4 sticky top-0 z-10">
-        <div className="flex justify-between items-center max-w-7xl mx-auto">
-          <div className="flex items-center space-x-3">
-            <Wine className="w-8 h-8 text-rose-600" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-purple-600 bg-clip-text text-transparent">
-              Wine Catalog
-            </h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowList(!showList)}
-              className="relative p-2 hover:bg-rose-50 rounded-lg transition-colors"
-              title="View List"
-            >
-              <ClipboardList className="w-6 h-6 text-slate-700" />
-              {specialOrderList.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                  {specialOrderList.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Filters */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6 mb-6 shadow-lg border border-amber-200/50">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search products..."
-                  className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Supplier</label>
-              <select
-                value={selectedSupplier}
-                onChange={(e) => setSelectedSupplier(e.target.value)}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
-              >
-                <option value="all">All Suppliers</option>
-                {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+                );
+              })}
             </div>
           </div>
         </div>
-
-        {/* Product Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map(product => {
-            const calc = calculateFrontlinePrice(product);
-            return (
-              <div key={product.id} className="bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-amber-200/50 hover:shadow-xl transition-all">
-                <div className="mb-4">
-                  <h3 className="font-bold text-lg text-slate-800">{product.producer}</h3>
-                  <p className="text-slate-600">{product.productName}</p>
-                </div>
-                <div className="space-y-2 text-sm text-slate-600 mb-6">
-                  <p><span className="font-medium">Size:</span> {product.bottleSize} | {product.packSize}pk</p>
-                  <p className="text-xs uppercase opacity-75">{product.supplier}</p>
-                </div>
-                <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-                  <div>
-                    <p className="text-2xl font-bold text-rose-600">${calc.frontlinePrice}</p>
-                    <p className="text-xs text-slate-500">per bottle</p>
-                  </div>
-                  <button
-                    onClick={() => addToList({ ...product, ...calc })}
-                    className="px-4 py-2 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg hover:from-rose-700 hover:to-rose-800 shadow-md transform hover:-translate-y-0.5 transition-all"
-                  >
-                    Add to List
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       {/* Special Order List Sidebar */}
       {showList && (
-        <div className="fixed inset-0 bg-black/50 z-50" onClick={closeSidebar}>
-          <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-800">{selectedCustomerForList ? `${selectedCustomerForList}'s List` : 'Your List'}</h2>
-                <button onClick={closeSidebar} className="p-2 hover:bg-slate-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] animate-in fade-in duration-300" onClick={closeSidebar}>
+          <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-[-32px_0_128px_-16px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col animate-in slide-in-from-right duration-500 ease-out" onClick={(e) => e.stopPropagation()}>
+            <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-[#faf9f6]/80 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{selectedCustomerForList ? `${selectedCustomerForList}'s Allocation` : 'Reserved Items'}</h2>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center">
+                  <span className="w-1 h-1 bg-rose-500 rounded-full mr-2"></span>
+                  Direct Procurement Request
+                </p>
               </div>
+              <button onClick={closeSidebar} className="p-3 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-200 shadow-sm">
+                <X className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
 
+            <div className="flex-grow overflow-y-auto p-10 space-y-10 custom-scrollbar">
               {specialOrderList.length === 0 ? (
-                <div className="text-center py-12">
-                  <ClipboardList className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">Your list is empty</p>
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
+                  <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center border border-slate-100 shadow-sm">
+                    <ClipboardList className="w-10 h-10 text-slate-200" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-extrabold text-slate-900 tracking-tight">Allocation is empty</p>
+                    <p className="text-sm text-slate-400 font-medium mt-1">Visit the catalog to reserve inventory.</p>
+                  </div>
                 </div>
               ) : (
-                <>
-                  <div className="space-y-4 mb-6">
-                    {specialOrderList.map(item => (
-                      <div key={item.id} className="border border-slate-200 rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
-                            <p className="font-semibold text-slate-800">{item.producer}</p>
-                            <p className="text-sm text-slate-600">{item.productName}</p>
-                            <p className="text-xs text-slate-400 mt-1">${item.frontlinePrice}/btl</p>
-                          </div>
-                          <button onClick={() => removeFromList(item.id)} className="text-red-500 ml-2"><X className="w-5 h-5" /></button>
+                <div className="space-y-6">
+                  {specialOrderList.map(item => (
+                    <div key={item.id} className="bg-white border border-slate-100 rounded-[2rem] p-8 hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 group">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="flex-1 pr-6">
+                          <p className="font-black text-lg text-slate-900 tracking-tight uppercase group-hover:text-rose-600 transition-colors">{item.producer}</p>
+                          <p className="text-sm text-slate-500 font-medium mt-0.5">{item.productName}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">${item.frontlinePrice} / unit frontline</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                          <input type="number" min="0" value={item.cases} onChange={(e) => updateListUnits(item.id, 'cases', e.target.value)} className="w-full px-3 py-2 border rounded-lg" placeholder="Cases" />
-                          <input type="number" min="0" value={item.bottles} onChange={(e) => updateListUnits(item.id, 'bottles', e.target.value)} className="w-full px-3 py-2 border rounded-lg" placeholder="Bottles" />
+                        <button
+                          onClick={() => removeFromList(item.id)}
+                          className="p-3 bg-slate-50 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent group-hover:bg-rose-50 group-hover:border-rose-100 shadow-sm"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6 mb-8">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Order Cases</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.cases}
+                            onChange={(e) => updateListUnits(item.id, 'cases', e.target.value)}
+                            className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-mono font-black text-slate-900"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Order Bottles</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.bottles}
+                            onChange={(e) => updateListUnits(item.id, 'bottles', e.target.value)}
+                            className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-mono font-black text-slate-900"
+                            placeholder="0"
+                          />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <button onClick={submitListUpdate} className="w-full py-4 bg-rose-600 text-white rounded-xl font-semibold">Submit Updates</button>
-                </>
+
+                      <div className="pt-6 border-t border-slate-50 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Procurement Status</span>
+                          {currentUser.type === 'admin' ? (
+                            <select
+                              value={item.status || 'Requested'}
+                              onChange={(e) => updateListItemMetadata(item.id, e.target.value, item.notes)}
+                              className="text-[10px] font-bold uppercase tracking-widest bg-slate-50 border border-slate-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-500/10 transition-all cursor-pointer"
+                            >
+                              <option value="Requested">Requested</option>
+                              <option value="Ordered">Ordered</option>
+                              <option value="Pending Arrival">Pending Arrival</option>
+                              <option value="In Stock">In Stock</option>
+                              <option value="Backordered">Backordered</option>
+                              <option value="Out of Stock">Out of Stock</option>
+                              <option value="Delivered">Delivered</option>
+                            </select>
+                          ) : (
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${item.status === 'Requested' ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                              item.status === 'Ordered' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                item.status === 'In Stock' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                  item.status === 'Backordered' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                    'bg-rose-50 text-rose-600 border-rose-100'
+                              }`}>
+                              {item.status || 'Requested'}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Allocation Notes</label>
+                          <textarea
+                            value={item.notes}
+                            onChange={(e) => updateListItemMetadata(item.id, item.status, e.target.value)}
+                            placeholder="Add memo for distributor..."
+                            rows="2"
+                            className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-xs text-slate-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
+            </div>
+
+            <div className="p-10 bg-white border-t border-slate-100 sticky bottom-0 z-10 shrink-0">
+              <button
+                onClick={submitListUpdate}
+                className="w-full bg-[#1a1a1a] text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 transition-all duration-300 shadow-xl shadow-slate-100 active:scale-[0.98]"
+              >
+                Finalize Allocation
+              </button>
             </div>
           </div>
         </div>
