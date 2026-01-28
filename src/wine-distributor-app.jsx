@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const WineDistributorApp = () => {
@@ -33,8 +33,10 @@ const WineDistributorApp = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
-  const [cart, setCart] = useState([]);
-  const [showCart, setShowCart] = useState(false);
+  const [specialOrderList, setSpecialOrderList] = useState([]); // Currently active list
+  const [allCustomerLists, setAllCustomerLists] = useState({}); // { username: [items] }
+  const [showList, setShowList] = useState(false);
+  const [selectedCustomerForList, setSelectedCustomerForList] = useState(null); // Admin view selection
   const [idealDeliveryDate, setIdealDeliveryDate] = useState('');
   const [mustHaveByDate, setMustHaveByDate] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
@@ -92,9 +94,15 @@ const WineDistributorApp = () => {
         setFormulas(JSON.parse(formulasResult.value));
       }
 
-      const templatesResult = await window.storage.get('wine-mapping-templates');
-      if (templatesResult) {
-        setMappingTemplates(JSON.parse(templatesResult.value));
+      const mappingTemplatesResult = await window.storage.get('wine-mapping-templates');
+      if (mappingTemplatesResult) {
+        setMappingTemplates(JSON.parse(mappingTemplatesResult.value));
+      }
+
+      const specialOrdersResult = await window.storage.get('wine-special-orders');
+      if (specialOrdersResult) {
+        const lists = JSON.parse(specialOrdersResult.value);
+        setAllCustomerLists(lists);
       }
     } catch (error) {
       console.log('No existing data found, starting fresh');
@@ -114,6 +122,11 @@ const WineDistributorApp = () => {
   const saveOrders = async (newOrders) => {
     setOrders(newOrders);
     await window.storage.set('wine-orders', JSON.stringify(newOrders));
+  };
+
+  const saveSpecialOrderLists = async (newLists) => {
+    setAllCustomerLists(newLists);
+    await window.storage.set('wine-special-orders', JSON.stringify(newLists));
   };
 
   const saveFormulas = async (newFormulas) => {
@@ -142,6 +155,8 @@ const WineDistributorApp = () => {
       const data = await response.json();
       if (data.success) {
         setCurrentUser(data.user);
+        const userList = allCustomerLists[data.user.username] || [];
+        setSpecialOrderList(userList);
         setView(data.user.type === 'admin' ? 'admin' : 'catalog');
       } else {
         setAuthError(data.error || 'Invalid credentials');
@@ -167,6 +182,7 @@ const WineDistributorApp = () => {
       const data = await response.json();
       if (data.success) {
         setCurrentUser(data.user);
+        setSpecialOrderList([]);
         setView(data.user.type === 'admin' ? 'admin' : 'catalog');
       } else {
         setAuthError(data.error || 'Signup failed');
@@ -179,7 +195,8 @@ const WineDistributorApp = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     setView('login');
-    setCart([]);
+    setSpecialOrderList([]);
+    setShowList(false);
   };
 
 
@@ -502,26 +519,43 @@ const WineDistributorApp = () => {
     }
   };
 
-  const addToCart = (product) => {
-    const existing = cart.find(item => item.id === product.id);
+  const addToList = async (product) => {
+    const username = currentUser.username;
+    const currentItems = allCustomerLists[username] || [];
+    const existing = currentItems.find(item => item.id === product.id);
+
     if (existing) {
-      setShowCart(true);
+      setSpecialOrderList(currentItems);
+      setShowList(true);
       return;
     } else {
       const packSize = parseInt(product.packSize) || 12;
-      setCart([...cart, {
+      const newList = [...currentItems, {
         ...product,
         cases: 1,
         bottles: 0,
         quantity: packSize
-      }]);
-      setShowCart(true);
+      }];
+
+      const updatedAllLists = {
+        ...allCustomerLists,
+        [username]: newList
+      };
+
+      await saveSpecialOrderLists(updatedAllLists);
+      setAllCustomerLists(updatedAllLists);
+      setSpecialOrderList(newList);
+      setShowList(true);
     }
   };
 
-  const updateCartUnits = (productId, unitType, value) => {
+  const updateListUnits = async (productId, unitType, value) => {
+    const username = selectedCustomerForList || currentUser.username;
     const val = Math.max(0, parseInt(value) || 0);
-    setCart(cart.map(item => {
+    const userList = allCustomerLists[username] || [];
+
+    const newList = userList.map(item => {
+      // ... existing map logic ...
       if (item.id === productId) {
         const newUnits = {
           cases: unitType === 'cases' ? val : item.cases,
@@ -537,32 +571,65 @@ const WineDistributorApp = () => {
         };
       }
       return item;
-    }));
+    });
+
+    const updatedAllLists = {
+      ...allCustomerLists,
+      [username]: newList
+    };
+
+    await saveSpecialOrderLists(updatedAllLists);
+    setAllCustomerLists(updatedAllLists);
+    setSpecialOrderList(newList);
   };
 
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.id !== productId));
+  const removeFromList = async (productId) => {
+    const username = selectedCustomerForList || currentUser.username;
+    const userList = allCustomerLists[username] || [];
+    const newList = userList.filter(item => item.id !== productId);
+
+    const updatedAllLists = {
+      ...allCustomerLists,
+      [username]: newList
+    };
+
+    await saveSpecialOrderLists(updatedAllLists);
+    setAllCustomerLists(updatedAllLists);
+    setSpecialOrderList(newList);
   };
 
-  const placeOrder = async () => {
-    const order = {
-      id: `order-${Date.now()}`,
-      customer: currentUser.username,
-      items: cart,
-      total: cart.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2),
-      status: 'pending',
+  const submitListUpdate = async () => {
+    const username = selectedCustomerForList || currentUser.username;
+    const currentItems = allCustomerLists[username] || [];
+
+    // Create an "Order" snapshot for history
+    const orderSnapshot = {
+      id: `update-${Date.now()}`,
+      customer: username,
+      items: currentItems,
+      total: currentItems.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2),
+      status: 'updated',
       date: new Date().toISOString(),
       idealDeliveryDate: idealDeliveryDate,
       mustHaveByDate: mustHaveByDate
     };
 
-    const updatedOrders = [...orders, order];
+    const updatedOrders = [...orders, orderSnapshot];
     await saveOrders(updatedOrders);
-    setCart([]);
+
+    // We don't clear the list anymore, it's ongoing
     setIdealDeliveryDate('');
     setMustHaveByDate('');
-    setShowCart(false);
-    alert('Order placed successfully! Your rep will be in touch.');
+    setShowList(false);
+    setSelectedCustomerForList(null);
+    alert('Special order list updated and rep notified!');
+  };
+
+  const closeSidebar = () => {
+    setShowList(false);
+    setSelectedCustomerForList(null);
+    // Refresh the local specialOrderList to the current user's list
+    setSpecialOrderList(allCustomerLists[currentUser.username] || []);
   };
 
   const generateOrderReport = () => {
@@ -901,6 +968,63 @@ const WineDistributorApp = () => {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Customer Special Order Lists */}
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 mb-8">
+            <div
+              className="flex items-center mb-4 cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-lg transition-colors"
+              onClick={() => toggleSection('customerLists')}
+            >
+              {collapsedSections.customerLists ? <ChevronRight className="w-5 h-5 mr-2 text-slate-400" /> : <ChevronDown className="w-5 h-5 mr-2 text-slate-400" />}
+              <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                <ClipboardList className="w-6 h-6 mr-2 text-rose-600" />
+                Customer Special Order Lists
+              </h2>
+            </div>
+
+            {!collapsedSections.customerLists && (
+              <>
+                {Object.keys(allCustomerLists).filter(user => allCustomerLists[user].length > 0).length === 0 ? (
+                  <p className="text-slate-500 text-center py-8">No active customer lists</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Object.entries(allCustomerLists)
+                      .filter(([_, items]) => items.length > 0)
+                      .map(([username, items]) => {
+                        const total = items.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2);
+                        return (
+                          <div
+                            key={username}
+                            className="border border-slate-200 rounded-lg p-4 hover:border-rose-300 hover:shadow-md transition-all cursor-pointer group"
+                            onClick={() => {
+                              setSelectedCustomerForList(username);
+                              setSpecialOrderList(items);
+                              setShowList(true);
+                            }}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h3 className="font-bold text-slate-800 group-hover:text-rose-600 transition-colors uppercase flex items-center">
+                                  <UserCheck className="w-4 h-4 mr-1.5 text-slate-400" />
+                                  {username}
+                                </h3>
+                                <p className="text-xs text-slate-500">{items.length} item(s) on list</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-rose-600">${total}</p>
+                              </div>
+                            </div>
+                            <div className="mt-3 flex justify-end text-xs font-semibold text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                              View & Edit List →
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </>
@@ -1439,13 +1563,14 @@ const WineDistributorApp = () => {
           </div>
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => setShowCart(!showCart)}
+              onClick={() => setShowList(!showList)}
               className="relative p-2 hover:bg-rose-50 rounded-lg transition-colors"
+              title="View Special Order List"
             >
-              <ShoppingCart className="w-6 h-6 text-slate-700" />
-              {cart.length > 0 && (
+              <ClipboardList className="w-6 h-6 text-slate-700" />
+              {specialOrderList.length > 0 && (
                 <span className="absolute -top-1 -right-1 bg-rose-600 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                  {cart.length}
+                  {specialOrderList.length}
                 </span>
               )}
             </button>
@@ -1541,10 +1666,10 @@ const WineDistributorApp = () => {
                       <p className="text-xs text-slate-500">per bottle</p>
                     </div>
                     <button
-                      onClick={() => addToCart({ ...product, ...calc })}
+                      onClick={() => addToList({ ...product, ...calc })}
                       className="px-4 py-2 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-lg hover:from-rose-700 hover:to-rose-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
-                      Add to Cart
+                      Add to List
                     </button>
                   </div>
                 </div>
@@ -1554,33 +1679,35 @@ const WineDistributorApp = () => {
         )}
       </div>
 
-      {/* Cart Sidebar */}
-      {showCart && (
-        <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setShowCart(false)}>
+      {/* Special Order List Sidebar */}
+      {showList && (
+        <div className="fixed inset-0 bg-black/50 z-50" onClick={closeSidebar}>
           <div
             className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-slate-800">Your Cart</h2>
+                <h2 className="text-2xl font-bold text-slate-800">
+                  {selectedCustomerForList ? `${selectedCustomerForList}'s List` : 'Your List'}
+                </h2>
                 <button
-                  onClick={() => setShowCart(false)}
+                  onClick={closeSidebar}
                   className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
-              {cart.length === 0 ? (
+              {specialOrderList.length === 0 ? (
                 <div className="text-center py-12">
-                  <ShoppingCart className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">Your cart is empty</p>
+                  <ClipboardList className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500">Your special order list is empty</p>
                 </div>
               ) : (
                 <>
                   <div className="space-y-4 mb-6">
-                    {cart.map(item => (
+                    {specialOrderList.map(item => (
                       <div key={item.id} className="border border-slate-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1">
@@ -1591,7 +1718,7 @@ const WineDistributorApp = () => {
                             </p>
                           </div>
                           <button
-                            onClick={() => removeFromCart(item.id)}
+                            onClick={() => removeFromList(item.id)}
                             className="text-red-500 hover:text-red-700 ml-2"
                           >
                             <X className="w-5 h-5" />
@@ -1605,7 +1732,7 @@ const WineDistributorApp = () => {
                               type="number"
                               min="0"
                               value={item.cases}
-                              onChange={(e) => updateCartUnits(item.id, 'cases', e.target.value)}
+                              onChange={(e) => updateListUnits(item.id, 'cases', e.target.value)}
                               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none transition-all"
                               placeholder="0"
                             />
@@ -1616,7 +1743,7 @@ const WineDistributorApp = () => {
                               type="number"
                               min="0"
                               value={item.bottles}
-                              onChange={(e) => updateCartUnits(item.id, 'bottles', e.target.value)}
+                              onChange={(e) => updateListUnits(item.id, 'bottles', e.target.value)}
                               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none transition-all"
                               placeholder="0"
                             />
@@ -1637,7 +1764,7 @@ const WineDistributorApp = () => {
                     <div className="flex justify-between items-center text-lg font-bold mb-4">
                       <span>Total:</span>
                       <span className="text-rose-600">
-                        ${cart.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2)}
+                        ${specialOrderList.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2)}
                       </span>
                     </div>
 
@@ -1666,10 +1793,10 @@ const WineDistributorApp = () => {
                   </div>
 
                   <button
-                    onClick={placeOrder}
+                    onClick={submitListUpdate}
                     className="w-full py-4 bg-gradient-to-r from-rose-600 to-rose-700 text-white rounded-xl font-semibold hover:from-rose-700 hover:to-rose-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                   >
-                    Place Order
+                    Submit Updates
                   </button>
                 </>
               )}

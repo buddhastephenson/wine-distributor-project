@@ -40,5 +40,47 @@
     "username": "admin_testtest_admin_verified",
     "password": "password",
     "type": "admin"
+  },
+  {
+    "id": "user-1769619106930",
+    "username": "cust_list_test_2",
+    "password": "password",
+    "type": "customer"
+  },
+  {
+    "id": "user-1769619174325",
+    "username": "admin_list_test_2",
+    "password": "password",
+    "type": "admin"
+  },
+  {
+    "id": "user-1769620292244",
+    "username": "final_customer",
+    "password": "password",
+    "type": "customer"
+  },
+  {
+    "id": "user-1769620410632",
+    "username": "final_adminfinal_customer",
+    "password": "passwordpassword",
+    "type": "admin"
+  },
+  {
+    "id": "user-1769620963612",
+    "username": "test_sync_1",
+    "password": "password123",
+    "type": "customer"
+  },
+  {
+    "id": "user-1769621003774",
+    "username": "test_sync_admintest_sync_1",
+    "password": "adminpass123password123",
+    "type": "admin"
+  },
+  {
+    "id": "user-1769621323976",
+    "username": "test_sync_admin",
+    "password": "password123adminpass123",
+    "type": "admin"
   }
 ]
