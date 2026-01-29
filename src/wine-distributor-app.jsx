@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus } from 'lucide-react';
+import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const WineDistributorApp = () => {
@@ -42,6 +42,7 @@ const WineDistributorApp = () => {
   const [uploadStatus, setUploadStatus] = useState('');
   const [pendingUpload, setPendingUpload] = useState(null);
   const [columnMapping, setColumnMapping] = useState(null);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [mappingTemplates, setMappingTemplates] = useState({});
   const [collapsedSections, setCollapsedSections] = useState({
     catalog: false,
@@ -250,8 +251,10 @@ const WineDistributorApp = () => {
 
     return {
       frontlinePrice: frontlinePrice.toFixed(2),
+      frontlineCase: (frontlinePrice * packSize).toFixed(2),
       srp: srp.toFixed(2),
       whlsBottle: whlsBottle.toFixed(2),
+      whlsCase: whlsCase.toFixed(2),
       laidIn: laidIn.toFixed(2),
       formulaUsed: productType.includes('spirit') ? 'spirits' : productType.includes('non-alc') || productType.includes('non alc') ? 'nonAlcoholic' : 'wine'
     };
@@ -351,6 +354,7 @@ const WineDistributorApp = () => {
             });
 
             setColumnMapping(autoMapping);
+            setShowSupplierModal(true);
             setTimeout(() => setUploadStatus(''), 2000);
           } else {
             throw new Error(result.error || 'Conversion failed');
@@ -408,6 +412,7 @@ const WineDistributorApp = () => {
           });
 
           setColumnMapping(autoMapping);
+          setShowSupplierModal(true);
           setTimeout(() => setUploadStatus(''), 2000);
         };
         reader.readAsArrayBuffer(file);
@@ -751,7 +756,7 @@ const WineDistributorApp = () => {
           'Size': item.bottleSize,
           'Pack': item.packSize,
           'FOB Case': item.fobCasePrice,
-          'Frontline Btl': item.frontlinePrice,
+          'Frontline Case': item.frontlineCase || (parseFloat(item.frontlinePrice) * parseInt(item.packSize)).toFixed(2),
           'Cases Ordered': item.cases || 0,
           'Bottles Ordered': item.bottles || 0,
           'Total Bottles': item.quantity,
@@ -779,13 +784,14 @@ const WineDistributorApp = () => {
           'Customer': username,
           'Establishment': username,
           'Date': new Date().toLocaleDateString(),
+          'Supplier': item.supplier || '',
           'Producer': item.producer,
           'Item': item.productName,
           'Item Code': item.itemCode || '',
           'Size': item.bottleSize || '',
           'Pack': item.packSize || '',
           'FOB Case': item.fobCasePrice || 0,
-          'Frontline Btl': item.frontlinePrice || 0,
+          'Frontline Case': item.frontlineCase || (parseFloat(item.frontlinePrice) * parseInt(item.packSize)).toFixed(2),
           'Cases': item.cases || 0,
           'Bottles': item.bottles || 0,
           'Total Bottles': item.quantity,
@@ -1683,9 +1689,92 @@ const WineDistributorApp = () => {
               )}
             </div>
 
+            {/* Supplier Selection Modal */}
+            {pendingUpload && showSupplierModal && (
+              <div className="bg-white rounded-[2.5rem] p-12 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.1)] border border-slate-100 mb-12 animate-in slide-in-from-bottom-8 duration-700">
+                <div className="flex justify-between items-start mb-10">
+                  <div>
+                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase mb-2">Identify Supplier</h2>
+                    <p className="text-sm text-slate-500 font-medium">Which distributor catalog does this file represent?</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setPendingUpload(null);
+                      setShowSupplierModal(false);
+                    }}
+                    className="p-3 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-all"
+                  >
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+
+                <div className="space-y-10">
+                  {/* Option A: Existing Suppliers */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">
+                      Existing Portfolios
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      {Array.from(new Set(products.map(p => p.supplier))).sort().map(s => (
+                        <button
+                          key={s}
+                          onClick={() => setPendingUpload({ ...pendingUpload, supplierName: s })}
+                          className={`px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 border flex items-center space-x-3 ${pendingUpload.supplierName === s
+                            ? 'bg-rose-500 text-white border-rose-500 shadow-xl shadow-rose-200 ring-4 ring-rose-500/10'
+                            : 'bg-white text-slate-500 border-slate-100 hover:border-rose-200 hover:text-rose-500 hover:bg-rose-50/30'
+                            }`}
+                        >
+                          <Package className={`w-3.5 h-3.5 ${pendingUpload.supplierName === s ? 'text-white' : 'text-slate-300'}`} />
+                          <span>{s}</span>
+                        </button>
+                      ))}
+                      {Array.from(new Set(products.map(p => p.supplier))).length === 0 && (
+                        <p className="text-xs text-slate-400 italic font-medium py-3">No existing suppliers found in catalog.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Option B: Manual Entry / New */}
+                  <div className="p-8 bg-[#faf9f6]/80 backdrop-blur-sm border border-slate-100 rounded-[2rem]">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 ml-1">
+                      Manual Identity Assignment
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={pendingUpload.supplierName}
+                        onChange={(e) => setPendingUpload({
+                          ...pendingUpload,
+                          supplierName: e.target.value
+                        })}
+                        placeholder="Enter supplier name exactly as it should appear..."
+                        className="w-full px-8 py-5 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-rose-500/5 focus:border-rose-500 transition-all font-bold text-lg text-slate-900 shadow-sm"
+                      />
+                      <Edit className="absolute right-6 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-300" />
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-4 ml-1 flex items-center tracking-widest">
+                      <span className="w-1 h-1 bg-amber-400 rounded-full mr-2"></span>
+                      Critical: Exact matches required to prevent duplicate entries
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100">
+                    <button
+                      onClick={() => setShowSupplierModal(false)}
+                      disabled={!pendingUpload.supplierName.trim()}
+                      className="w-full bg-[#1a1a1a] text-white py-6 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 transition-all duration-300 shadow-2xl shadow-slate-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group"
+                    >
+                      <span>Proceed to Column Mapping</span>
+                      <ChevronRight className="w-4 h-4 inline-block ml-2 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Column Mapping UI */}
             {
-              pendingUpload && columnMapping && (
+              pendingUpload && columnMapping && !showSupplierModal && (
                 <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.1)] border border-slate-100 mb-12 animate-in zoom-in-95 duration-500">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
@@ -2066,7 +2155,19 @@ const WineDistributorApp = () => {
                         <span className="text-[11px] font-mono text-slate-300">{product.itemCode}</span>
                       </div>
                       <h3 className="font-extrabold text-2xl text-slate-900 tracking-tight leading-tight group-hover:text-rose-600 transition-colors uppercase">{product.producer}</h3>
-                      <p className="text-slate-500 font-medium mt-1 leading-relaxed">{product.productName}</p>
+                      {product.productLink ? (
+                        <a
+                          href={product.productLink.startsWith('http') ? product.productLink : `https://${product.productLink}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-slate-500 font-medium mt-1 leading-relaxed hover:text-rose-600 transition-all inline-flex items-center group/link decoration-slate-200"
+                        >
+                          {product.productName}
+                          <ExternalLink className="w-3 h-3 ml-2 opacity-0 group-hover/link:opacity-100 transition-all transform translate-x-1" />
+                        </a>
+                      ) : (
+                        <p className="text-slate-500 font-medium mt-1 leading-relaxed">{product.productName}</p>
+                      )}
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-slate-50 flex flex-col gap-6">
@@ -2089,7 +2190,7 @@ const WineDistributorApp = () => {
                         className="w-full bg-[#1a1a1a] text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all duration-300 flex items-center justify-center space-x-3 active:scale-[0.98] shadow-lg shadow-slate-200"
                       >
                         <Plus className="w-4 h-4" />
-                        <span>Reserve Allocation</span>
+                        <span>Submit Request</span>
                       </button>
                     </div>
                   </div>
@@ -2106,7 +2207,7 @@ const WineDistributorApp = () => {
           <div className="absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-[-32px_0_128px_-16px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col animate-in slide-in-from-right duration-500 ease-out" onClick={(e) => e.stopPropagation()}>
             <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-[#faf9f6]/80 backdrop-blur-sm sticky top-0 z-10 shrink-0">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{selectedCustomerForList ? `${selectedCustomerForList}'s Allocation` : 'Reserved Items'}</h2>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{selectedCustomerForList ? `${selectedCustomerForList}'s Request List` : 'My Request List'}</h2>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1.5 flex items-center">
                   <span className="w-1 h-1 bg-rose-500 rounded-full mr-2"></span>
                   Direct Procurement Request
@@ -2124,7 +2225,7 @@ const WineDistributorApp = () => {
                     <ClipboardList className="w-10 h-10 text-slate-200" />
                   </div>
                   <div>
-                    <p className="text-xl font-extrabold text-slate-900 tracking-tight">Allocation is empty</p>
+                    <p className="text-xl font-extrabold text-slate-900 tracking-tight">Request list is empty</p>
                     <p className="text-sm text-slate-400 font-medium mt-1">Visit the catalog to reserve inventory.</p>
                   </div>
                 </div>
@@ -2201,7 +2302,7 @@ const WineDistributorApp = () => {
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Allocation Notes</label>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Request Notes</label>
                           <textarea
                             value={item.notes}
                             onChange={(e) => updateListItemMetadata(item.id, item.status, e.target.value)}
@@ -2222,7 +2323,7 @@ const WineDistributorApp = () => {
                 onClick={submitListUpdate}
                 className="w-full bg-[#1a1a1a] text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-800 transition-all duration-300 shadow-xl shadow-slate-100 active:scale-[0.98]"
               >
-                Finalize Allocation
+                {currentUser.type === 'admin' ? 'Update' : 'Submit/Update Request'}
               </button>
             </div>
           </div>
