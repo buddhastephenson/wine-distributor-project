@@ -763,6 +763,7 @@ const WineDistributorApp = () => {
         quantity: packSize,
         status: 'Requested',
         notes: '',
+        adminNotes: '',
         submitted: false
       }];
 
@@ -811,12 +812,12 @@ const WineDistributorApp = () => {
     setSpecialOrderList(newList);
   };
 
-  const updateListItemMetadata = async (productId, status, notes) => {
+  const updateListItemMetadata = async (productId, status, notes, adminNotes) => {
     const username = selectedCustomerForList || currentUser.username;
     const userList = allCustomerLists[username] || [];
     const newList = userList.map(item => {
       if (item.id === productId) {
-        return { ...item, status, notes };
+        return { ...item, status, notes, adminNotes: adminNotes !== undefined ? adminNotes : item.adminNotes };
       }
       return item;
     });
@@ -980,7 +981,10 @@ const WineDistributorApp = () => {
           'Bottles': item.bottles || 0,
           'Total Bottles': item.quantity,
           'Status': item.status || 'Requested',
-          'Notes': item.notes || ''
+          'Admin Comments': item.adminNotes || '',
+          'Notes': item.notes || '',
+          '_username': username,
+          '_item_id': item.id
         });
       });
     });
@@ -994,6 +998,78 @@ const WineDistributorApp = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Special Order Requests');
     XLSX.writeFile(workbook, `AOC_Special_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleStatusSyncUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadStatus('Synchronizing statuses...');
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+        const updatedAllLists = { ...allCustomerLists };
+        let updateCount = 0;
+
+        jsonData.forEach(row => {
+          const username = row['_username'];
+          const itemId = row['_item_id'];
+          // Find status with flexible key matching
+          const statusKey = Object.keys(row).find(key => key.toLowerCase() === 'status');
+          const newStatus = statusKey ? row[statusKey] : null;
+
+          const adminNotesKey = Object.keys(row).find(key => key.toLowerCase().includes('admin') && key.toLowerCase().includes('comment'));
+          const newAdminNotes = adminNotesKey ? row[adminNotesKey] : row['Admin Comments'];
+
+          if (username && itemId && updatedAllLists[username]) {
+            updatedAllLists[username] = updatedAllLists[username].map(item => {
+              if (item.id === itemId) {
+                updateCount++;
+                let status = (newStatus && newStatus.trim()) || item.status;
+
+                // Map legacy/common terms to our structured labels
+                if (status === 'Ordered') status = 'Ordered from Supplier';
+                if (status.toLowerCase() === 'created') status = 'ERP Item Created';
+                if (status.toLowerCase() === 'sample') status = 'Sample Pending';
+                if (status.toLowerCase() === 'arriving') status = 'Pending Arrival';
+                if (status.toLowerCase() === 'received') status = 'In Stock';
+
+                return {
+                  ...item,
+                  status: status,
+                  adminNotes: newAdminNotes !== undefined ? newAdminNotes : item.adminNotes
+                };
+              }
+              return item;
+            });
+          }
+        });
+
+        await saveSpecialOrderLists(updatedAllLists);
+        setAllCustomerLists(updatedAllLists);
+
+        // Update active view if viewing a specific list
+        if (selectedCustomerForList) {
+          setSpecialOrderList(updatedAllLists[selectedCustomerForList] || []);
+        } else if (currentUser && !originalAdmin) {
+          setSpecialOrderList(updatedAllLists[currentUser.username] || []);
+        }
+
+        setUploadStatus(`Successfully synchronized ${updateCount} items.`);
+        setTimeout(() => setUploadStatus(''), 5000);
+      } catch (error) {
+        console.error('Sync error:', error);
+        setUploadStatus('Error synchronizing statuses. Please ensure you are using the correct export file.');
+        setTimeout(() => setUploadStatus(''), 5000);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
   };
 
   const generateCatalogReport = () => {
@@ -1312,15 +1388,31 @@ const WineDistributorApp = () => {
                 <p className="text-xs text-slate-400 mt-2 font-medium italic">Completed transactions</p>
               </div>
 
-              <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80">
+              <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 hover:border-purple-200 hover:shadow-xl hover:shadow-purple-900/[0.03] transition-all duration-300 group relative">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center border border-purple-100/50">
-                    <Users className="w-6 h-6 text-purple-600" />
+                  <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center border border-purple-100/50 group-hover:bg-purple-600 group-hover:border-purple-600 transition-all duration-300">
+                    <FileSpreadsheet className="w-6 h-6 text-purple-600 group-hover:text-white transition-all duration-300" />
                   </div>
+                  <label className="cursor-pointer px-3 py-1 bg-purple-100 text-purple-700 text-[10px] font-bold rounded-full hover:bg-purple-200 transition-colors">
+                    SYNC XLS
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".xlsx, .xls"
+                      onChange={handleStatusSyncUpload}
+                    />
+                  </label>
                 </div>
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Suppliers and Offers</p>
-                <p className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">{suppliers.length}</p>
-                <p className="text-xs text-slate-400 mt-2 font-medium italic">Unique distributors</p>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest group-hover:text-purple-700 transition-colors">Sync Statuses</p>
+                <p className="text-3xl font-extrabold text-slate-900 mt-2 tracking-tight">Status Sync</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-slate-400 font-medium italic">Upload modified report</p>
+                  {uploadStatus && (
+                    <span className="text-[10px] font-bold text-purple-600 animate-pulse bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100">
+                      {uploadStatus}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div
@@ -2812,7 +2904,10 @@ const WineDistributorApp = () => {
                               className="text-[10px] font-bold uppercase tracking-widest bg-slate-50 border border-slate-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-rose-500/10 transition-all cursor-pointer"
                             >
                               <option value="Requested">Requested</option>
+                              <option value="ERP Item Created">ERP Item Created</option>
+                              <option value="Sample Pending">Sample Pending</option>
                               <option value="Ordered">Ordered</option>
+                              <option value="Ordered from Supplier">Ordered from Supplier</option>
                               <option value="Pending Arrival">Pending Arrival</option>
                               <option value="In Stock">In Stock</option>
                               <option value="Backordered">Backordered</option>
@@ -2820,11 +2915,13 @@ const WineDistributorApp = () => {
                               <option value="Delivered">Delivered</option>
                             </select>
                           ) : (
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${item.status === 'Requested' ? 'bg-slate-50 text-slate-400 border-slate-100' :
-                              item.status === 'Ordered' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                item.status === 'In Stock' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                  item.status === 'Backordered' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                    'bg-rose-50 text-rose-600 border-rose-100'
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border ${(item.status || 'Requested').toUpperCase().includes('REQUESTED') ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                              (item.status || '').toUpperCase().includes('ORDERED') ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                (item.status || '').toUpperCase().includes('STOCK') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                  (item.status || '').toUpperCase().includes('BACKORDERED') ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                    (item.status || '').toUpperCase().includes('PENDING') ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                      (item.status || '').toUpperCase().includes('DELIVERED') ? 'bg-green-50 text-green-700 border-green-100' :
+                                        'bg-rose-50 text-rose-600 border-rose-100'
                               }`}>
                               {item.status || 'Requested'}
                             </span>
@@ -2836,11 +2933,31 @@ const WineDistributorApp = () => {
                           <textarea
                             value={item.notes}
                             onChange={(e) => updateListItemMetadata(item.id, item.status, e.target.value)}
+                            disabled={item.submitted && currentUser.type === 'customer'}
                             placeholder="Add memo for distributor..."
                             rows="2"
-                            className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-xs text-slate-500"
+                            className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-xs text-slate-500 disabled:opacity-50"
                           />
                         </div>
+
+                        {(currentUser.type === 'admin' || item.adminNotes) && (
+                          <div className="space-y-1.5 pt-2">
+                            <label className="text-[10px] font-black text-rose-600 uppercase tracking-widest ml-1">Admin Comments</label>
+                            {currentUser.type === 'admin' ? (
+                              <textarea
+                                value={item.adminNotes || ''}
+                                onChange={(e) => updateListItemMetadata(item.id, item.status, item.notes, e.target.value)}
+                                placeholder="Update status comments for customer..."
+                                rows="2"
+                                className="w-full px-5 py-4 bg-rose-50/30 border border-rose-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-xs text-slate-600"
+                              />
+                            ) : (
+                              <div className="px-5 py-4 bg-rose-50/50 border border-rose-100 rounded-2xl font-medium text-xs text-rose-700">
+                                {item.adminNotes}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
