@@ -45,12 +45,15 @@ const WineDistributorApp = () => {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [mappingTemplates, setMappingTemplates] = useState({});
   const [collapsedSections, setCollapsedSections] = useState({
-    catalog: false,
-    orders: false,
-    discontinued: false,
-    formulas: false,
-    dressner: false,
-    team: false
+    catalog: true,
+    orders: true,
+    discontinued: true,
+    formulas: true,
+    dressner: true,
+    team: true,
+    customerLists: true,
+    suppliers: true,
+    upload: true
   });
   const [allUsers, setAllUsers] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
