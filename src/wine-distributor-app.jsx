@@ -812,6 +812,38 @@ const WineDistributorApp = () => {
     XLSX.writeFile(workbook, `AOC_Special_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const generateCatalogReport = () => {
+    if (products.length === 0) {
+      alert('No products in catalog to export');
+      return;
+    }
+
+    const reportData = products.map(product => ({
+      'Supplier': product.supplier || '',
+      'Producer': product.producer,
+      'Product': product.productName,
+      'Vintage': product.vintage || 'NV',
+      'Item Code': product.itemCode || '',
+      'Type': product.productType || 'Wine',
+      'Size': product.bottleSize,
+      'Pack': product.packSize,
+      'FOB Case': product.fobCasePrice,
+      'Frontline Btl': product.frontlinePrice,
+      'Frontline Case': product.frontlineCase || (parseFloat(product.frontlinePrice) * parseInt(product.packSize)).toFixed(2),
+      'SRP': product.srp,
+      'Wholesale Btl': product.whlsBottle,
+      'Wholesale Case': product.whlsCase,
+      'Laid In': product.laidIn
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(reportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Active Catalog');
+
+    // Save the file
+    XLSX.writeFile(workbook, `AOC_Active_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   const filteredProducts = products.filter(product => {
     const matchesSearch =
       product.producer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -982,13 +1014,17 @@ const WineDistributorApp = () => {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-              <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80">
+              <div
+                onClick={generateCatalogReport}
+                className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/80 cursor-pointer hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/[0.03] transition-all duration-300 group"
+              >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100/50">
-                    <Package className="w-6 h-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100/50 group-hover:bg-blue-600 group-hover:border-blue-600 transition-all duration-300">
+                    <Package className="w-6 h-6 text-blue-600 group-hover:text-white transition-all duration-300" />
                   </div>
+                  <div className="px-3 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full opacity-0 group-hover:opacity-100 transition-opacity">EXPORT XLS</div>
                 </div>
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Active Catalog</p>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest group-hover:text-blue-700 transition-colors">Active Catalog</p>
                 <p className="text-4xl font-extrabold text-slate-900 mt-2 tracking-tight">{products.length}</p>
                 <p className="text-xs text-slate-400 mt-2 font-medium italic">Unique products</p>
               </div>
