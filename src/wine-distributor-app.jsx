@@ -66,6 +66,22 @@ const WineDistributorApp = () => {
   const [catalogViewMode, setCatalogViewMode] = useState('grid'); // 'grid' or 'list' for customer catalog
   const [taxonomy, setTaxonomy] = useState({});
   const [useManualLocation, setUseManualLocation] = useState(false);
+  const [priceRange, setPriceRange] = useState([0, 1000]); // [min, max]
+  const [catalogPriceBounds, setCatalogPriceBounds] = useState({ min: 0, max: 1000 });
+
+  // Initialize price bounds based on active products
+  useEffect(() => {
+    if (products.length > 0) {
+      const prices = products.map(p => parseFloat(calculateFrontlinePrice(p).whlsBottle) || 0);
+      const min = Math.floor(Math.min(...prices));
+      const max = Math.ceil(Math.max(...prices));
+      setCatalogPriceBounds({ min, max });
+      // Only set initial range if it looks like default/empty
+      if (priceRange[0] === 0 && priceRange[1] === 1000) {
+        setPriceRange([min, max]);
+      }
+    }
+  }, [products]);
 
   // Initialize manual mode based on product data validity against taxonomy
   useEffect(() => {
@@ -1171,7 +1187,11 @@ const WineDistributorApp = () => {
     const matchesRegion = selectedRegion === 'all' || (product.region && product.region.toLowerCase() === selectedRegion.toLowerCase());
     const matchesAppellation = selectedAppellation === 'all' || (product.appellation && product.appellation.toLowerCase() === selectedAppellation.toLowerCase());
 
-    return matchesSearch && matchesSupplier && matchesCountry && matchesRegion && matchesAppellation;
+    // Price Filter
+    const price = parseFloat(calculateFrontlinePrice(product).whlsBottle) || 0;
+    const matchesPrice = price >= priceRange[0] && price <= priceRange[1];
+
+    return matchesSearch && matchesSupplier && matchesCountry && matchesRegion && matchesAppellation && matchesPrice;
   });
 
   const uniqueCountries = [...new Set(products.map(p => p.country).filter(Boolean))].sort();
@@ -1197,6 +1217,7 @@ const WineDistributorApp = () => {
     setSelectedCountry('all');
     setSelectedRegion('all');
     setSelectedAppellation('all');
+    setPriceRange([catalogPriceBounds.min, catalogPriceBounds.max]);
   };
 
   const suppliers = [...new Set(products.map(p => p.supplier))];
@@ -1403,6 +1424,21 @@ const WineDistributorApp = () => {
   // Authenticated View
   return (
     <div className="min-h-screen bg-[#faf9f6]">
+      <style>{`
+        .range-slider-thumb {
+          pointer-events: none;
+        }
+        .range-slider-thumb::-webkit-slider-thumb {
+          pointer-events: auto;
+          pointer-events: all;
+          cursor: pointer;
+        }
+        .range-slider-thumb::-moz-range-thumb {
+          pointer-events: auto;
+          pointer-events: all;
+          cursor: pointer;
+        }
+      `}</style>
       {view === 'admin' ? (
         <div className="admin-view-transition-container">
           <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-200/50 sticky top-0 z-50 px-8 py-5">
@@ -2967,8 +3003,8 @@ const WineDistributorApp = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div className="space-y-1.5 lg:col-span-1">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Distributor / Portfolio</label>
                   <div className="relative">
                     <select
@@ -2982,7 +3018,61 @@ const WineDistributorApp = () => {
                     <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
                   </div>
                 </div>
-                <div className="flex items-end justify-end space-x-2">
+
+                {/* Price Range Slider */}
+                <div className="md:col-span-2 lg:col-span-2 flex flex-col space-y-2 pb-1 px-1">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Price Range (Wholesale)</label>
+                    <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
+                      ${priceRange[0]} - ${priceRange[1]}
+                    </span>
+                  </div>
+                  <div className="relative h-10 flex items-center mb-1">
+                    <div className="absolute w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-rose-400 md:bg-gradient-to-r md:from-rose-400 md:to-rose-600 opacity-80"
+                        style={{
+                          marginLeft: `${((priceRange[0] - catalogPriceBounds.min) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%`,
+                          width: `${((priceRange[1] - priceRange[0]) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%`
+                        }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min={catalogPriceBounds.min}
+                      max={catalogPriceBounds.max}
+                      value={priceRange[0]}
+                      onChange={(e) => {
+                        const val = Math.min(Number(e.target.value), priceRange[1] - 1);
+                        setPriceRange([val, priceRange[1]]);
+                      }}
+                      className="absolute w-full h-1.5 opacity-0 z-20 range-slider-thumb appearance-none bg-transparent pointer-events-none"
+                    />
+                    <input
+                      type="range"
+                      min={catalogPriceBounds.min}
+                      max={catalogPriceBounds.max}
+                      value={priceRange[1]}
+                      onChange={(e) => {
+                        const val = Math.max(Number(e.target.value), priceRange[0] + 1);
+                        setPriceRange([priceRange[0], val]);
+                      }}
+                      className="absolute w-full h-1.5 opacity-0 z-20 range-slider-thumb appearance-none bg-transparent pointer-events-none"
+                    />
+
+                    {/* Visible Thumbs */}
+                    <div
+                      className="absolute w-5 h-5 bg-white border-2 border-rose-500 rounded-full shadow-md pointer-events-none transform -translate-x-1/2 transition-all"
+                      style={{ left: `${((priceRange[0] - catalogPriceBounds.min) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%` }}
+                    />
+                    <div
+                      className="absolute w-5 h-5 bg-white border-2 border-rose-500 rounded-full shadow-md pointer-events-none transform -translate-x-1/2 transition-all"
+                      style={{ left: `${((priceRange[1] - catalogPriceBounds.min) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-end space-x-2 lg:col-span-1">
                   <button
                     onClick={() => setCatalogViewMode('grid')}
                     className={`p-3 rounded-xl transition-all ${catalogViewMode === 'grid' ? 'bg-white shadow-md text-rose-600 border border-slate-100' : 'text-slate-400 hover:text-slate-600 border border-transparent'}`}
