@@ -151,5 +151,12 @@
     "password": "password",
     "type": "customer",
     "email": "admin@aocwines.com"
+  },
+  {
+    "id": "user-1769686348572",
+    "username": "The Gentleman Looser",
+    "password": "@!yrGQjE4m4P",
+    "type": "customer",
+    "email": "matt.cory@gmail.com"
   }
 ]
