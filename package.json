@@ -5,6 +5,7 @@
   "private": true,
   "homepage": ".",
   "dependencies": {
+    "@supabase/supabase-js": "^2.93.3",
     "body-parser": "^2.2.2",
     "concurrently": "^9.2.1",
     "cors": "^2.8.6",
