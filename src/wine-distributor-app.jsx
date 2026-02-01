@@ -3,6 +3,9 @@ import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpre
 import * as XLSX from 'xlsx';
 import { signIn, signUp, signOut, resetPasswordRequest, updatePassword, getCurrentUser, onAuthStateChange } from './lib/auth';
 import { getProducts, getDiscontinuedProducts, saveProduct, saveProducts, deleteProduct, discontinueProductsBySupplier, getSuppliers } from './lib/products';
+import { getFormulas, updateFormula } from './lib/formulas';
+import { getOrders, createOrder, updateOrder } from './lib/orders';
+import { getAllSpecialOrders } from './lib/special-orders';
 
 const WineDistributorApp = () => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -136,53 +139,48 @@ const WineDistributorApp = () => {
       const supabaseProducts = await getProducts();
       if (supabaseProducts.length > 0) {
         setProducts(supabaseProducts);
-      } else {
-        // Fallback to local storage if Supabase is empty
-        const productsResult = await window.storage?.get('wine-products');
-        if (productsResult) {
-          setProducts(JSON.parse(productsResult.value));
-        }
       }
 
       // Load discontinued products from Supabase
       const supabaseDiscontinued = await getDiscontinuedProducts();
       if (supabaseDiscontinued.length > 0) {
         setDiscontinuedProducts(supabaseDiscontinued);
-      } else {
-        const discontinuedResult = await window.storage?.get('wine-discontinued');
-        if (discontinuedResult) {
-          setDiscontinuedProducts(JSON.parse(discontinuedResult.value));
+      }
+
+      // Load orders from Supabase
+      const supabaseOrders = await getOrders();
+      setOrders(supabaseOrders);
+
+      // Load formulas from Supabase
+      const supabaseFormulas = await getFormulas();
+      if (supabaseFormulas && Object.keys(supabaseFormulas).length > 0) {
+        setFormulas(supabaseFormulas);
+      }
+
+      // Load special orders from Supabase
+      const supabaseSpecialOrders = await getAllSpecialOrders();
+      setAllCustomerLists(supabaseSpecialOrders);
+
+      // These still use local storage for now (low priority)
+      try {
+        const mappingTemplatesResult = await window.storage?.get('wine-mapping-templates');
+        if (mappingTemplatesResult) {
+          setMappingTemplates(JSON.parse(mappingTemplatesResult.value));
         }
+      } catch (e) {
+        console.log('No mapping templates found');
       }
 
-      // These still use local storage for now
-      const ordersResult = await window.storage?.get('wine-orders');
-      if (ordersResult) {
-        setOrders(JSON.parse(ordersResult.value));
+      try {
+        const orderNotesResult = await window.storage?.get('wine-order-notes');
+        if (orderNotesResult) {
+          setOrderNotes(JSON.parse(orderNotesResult.value));
+        }
+      } catch (e) {
+        console.log('No order notes found');
       }
 
-      const formulasResult = await window.storage?.get('wine-formulas');
-      if (formulasResult) {
-        setFormulas(JSON.parse(formulasResult.value));
-      }
-
-      const mappingTemplatesResult = await window.storage?.get('wine-mapping-templates');
-      if (mappingTemplatesResult) {
-        setMappingTemplates(JSON.parse(mappingTemplatesResult.value));
-      }
-
-      const specialOrdersResult = await window.storage?.get('wine-special-orders');
-      if (specialOrdersResult) {
-        const lists = JSON.parse(specialOrdersResult.value);
-        setAllCustomerLists(lists);
-      }
-
-      const orderNotesResult = await window.storage?.get('wine-order-notes');
-      if (orderNotesResult) {
-        setOrderNotes(JSON.parse(orderNotesResult.value));
-      }
-
-      // Load Taxonomy
+      // Taxonomy - try local, will migrate later
       try {
         const taxonomyResponse = await fetch('http://localhost:3001/api/storage/taxonomy');
         if (taxonomyResponse.ok) {
@@ -192,10 +190,10 @@ const WineDistributorApp = () => {
           }
         }
       } catch (e) {
-        console.error('Failed to load taxonomy', e);
+        console.log('Taxonomy not available');
       }
     } catch (error) {
-      console.log('Error loading data:', error);
+      console.error('Error loading data:', error);
     }
   };
 
