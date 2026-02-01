@@ -151,5 +151,19 @@
     "password": "password",
     "type": "customer",
     "email": "admin@aocwines.com"
+  },
+  {
+    "id": "user-1769930374685",
+    "username": "adminadmin",
+    "password": "",
+    "type": "customer",
+    "email": ""
+  },
+  {
+    "id": "user-1769930458536",
+    "username": "",
+    "password": "",
+    "type": "customer",
+    "email": ""
   }
 ]
