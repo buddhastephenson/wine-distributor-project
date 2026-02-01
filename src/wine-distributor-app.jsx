@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink, LayoutGrid, List } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { signIn, signUp, signOut, resetPasswordRequest, updatePassword, getCurrentUser, onAuthStateChange } from './lib/auth';
 
 const WineDistributorApp = () => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -225,55 +226,62 @@ const WineDistributorApp = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
-    try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: authUsername, password: authPassword })
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCurrentUser(data.user);
-        const userList = allCustomerLists[data.user.username] || [];
-        setSpecialOrderList(userList);
-        if (data.user.type === 'admin') {
-          fetchAllUsers();
-          setView('admin');
-        } else {
-          setView('catalog');
-        }
-      } else {
-        setAuthError(data.error || 'Invalid credentials');
-      }
-    } catch (error) {
-      setAuthError('Server connection failed');
+
+    // If username looks like an email, use it directly
+    const email = authUsername.includes('@') ? authUsername : authEmail || `${authUsername}@placeholder.com`;
+
+    const result = await signIn({
+      email,
+      password: authPassword,
+    });
+
+    if (result.error) {
+      setAuthError(result.error);
+      return;
+    }
+
+    setCurrentUser(result.user);
+    const userList = allCustomerLists[result.user.username] || [];
+    setSpecialOrderList(userList);
+
+    if (result.user.type === 'admin' || result.user.type === 'super_admin') {
+      fetchAllUsers();
+      setView('admin');
+    } else {
+      setView('catalog');
     }
   };
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setAuthError('');
-    try {
-      const response = await fetch('http://localhost:3001/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: authUsername,
-          password: authPassword,
-          email: authEmail
-        })
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCurrentUser(data.user);
-        setSpecialOrderList([]);
-        setView(data.user.type === 'admin' ? 'admin' : 'catalog');
-      } else {
-        setAuthError(data.error || 'Signup failed');
-      }
-    } catch (error) {
-      setAuthError('Server connection failed');
+
+    const result = await signUp({
+      email: authEmail,
+      password: authPassword,
+      username: authUsername,
+      organizationId: 'a0000000-0000-0000-0000-000000000001', // AOC Wines - hardcoded for now
+    });
+
+    if (result.error) {
+      setAuthError(result.error);
+      return;
     }
+
+    // Auto sign in after signup
+    const signInResult = await signIn({
+      email: authEmail,
+      password: authPassword,
+    });
+
+    if (signInResult.error) {
+      setAuthError('Account created but could not sign in. Please try logging in.');
+      return;
+    }
+
+    setCurrentUser(signInResult.user);
+    setSpecialOrderList([]);
+    setView(signInResult.user.type === 'admin' ? 'admin' : 'catalog');
   };
 
   const handleForgotPassword = async (e) => {
@@ -374,7 +382,8 @@ const WineDistributorApp = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     setCurrentUser(null);
     setOriginalAdmin(null);
     setView('login');
