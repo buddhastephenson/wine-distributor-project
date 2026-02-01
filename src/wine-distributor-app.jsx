@@ -71,16 +71,31 @@ const WineDistributorApp = () => {
   const [priceRange, setPriceRange] = useState([0, 1000]); // [min, max]
   const [catalogPriceBounds, setCatalogPriceBounds] = useState({ min: 0, max: 1000 });
   const [orderNotes, setOrderNotes] = useState({}); // { username: "note content" }
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+  const [newProductData, setNewProductData] = useState({
+    supplier: '',
+    producer: '',
+    productType: 'wine',
+    productName: '',
+    itemCode: '',
+    bottleSize: '750',
+    packSize: '12',
+    fobCasePrice: ''
+  });
 
   // Initialize price bounds based on active products
   useEffect(() => {
     if (products.length > 0) {
       const prices = products.map(p => parseFloat(calculateFrontlinePrice(p).whlsBottle) || 0);
-      const min = Math.floor(Math.min(...prices));
+      const min = 0; // The user wants the price range bar to always start at $0
       const max = Math.ceil(Math.max(...prices));
+
+      const prevBounds = catalogPriceBounds;
       setCatalogPriceBounds({ min, max });
-      // Only set initial range if it looks like default/empty
-      if (priceRange[0] === 0 && priceRange[1] === 1000) {
+
+      // Auto-expand selection if it was already at the default/previous bounds
+      if ((priceRange[0] === 0 && priceRange[1] === 1000) ||
+        (priceRange[0] === prevBounds.min && priceRange[1] === prevBounds.max)) {
         setPriceRange([min, max]);
       }
     }
@@ -404,7 +419,7 @@ const WineDistributorApp = () => {
 
 
   const calculateFrontlinePrice = (product) => {
-    const productType = product.productType.toLowerCase();
+    const productType = (product.productType || 'wine').toLowerCase();
     let formula = formulas.wine;
 
     if (productType.includes('spirit') || productType.includes('liquor') || productType.includes('vodka') || productType.includes('whiskey') || productType.includes('whisky') || productType.includes('bourbon') || productType.includes('rum') || productType.includes('gin') || productType.includes('tequila')) {
@@ -455,6 +470,46 @@ const WineDistributorApp = () => {
       laidIn: laidIn.toFixed(2),
       formulaUsed: productType.includes('spirit') ? 'spirits' : productType.includes('non-alc') || productType.includes('non alc') ? 'nonAlcoholic' : 'wine'
     };
+  };
+
+  const handleQuickCreateProduct = async () => {
+    // Validation
+    if (!newProductData.supplier || !newProductData.producer || !newProductData.productName || !newProductData.fobCasePrice) {
+      alert('Please fill in all required fields (Supplier, Producer, Product Name, and FOB Case Price)');
+      return;
+    }
+
+    const baseProduct = {
+      ...newProductData,
+      id: `prod-manual-${Date.now()}`,
+      uploadDate: new Date().toISOString(),
+      fobCasePrice: parseFloat(newProductData.fobCasePrice) || 0,
+      packSize: parseInt(newProductData.packSize) || 12,
+      bottleSize: String(newProductData.bottleSize).replace(/[^0-9.]/g, '') || '750',
+      vintage: '', // Manual products might not include vintage in the quick form
+      productLink: '',
+      country: '',
+      region: '',
+      appellation: ''
+    };
+
+    const derivedPricing = calculateFrontlinePrice(baseProduct);
+    const finalProduct = { ...baseProduct, ...derivedPricing };
+
+    const newProducts = [finalProduct, ...products];
+    await saveProducts(newProducts);
+
+    setIsCreatingProduct(false);
+    setNewProductData({
+      supplier: '',
+      producer: '',
+      productType: 'wine',
+      productName: '',
+      itemCode: '',
+      bottleSize: '750',
+      packSize: '12',
+      fobCasePrice: ''
+    });
   };
 
   const getProductLink = (product) => {
@@ -1239,9 +1294,12 @@ const WineDistributorApp = () => {
       product.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.vintage?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.supplier?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.itemCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.country?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.region?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.appellation?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (view === 'admin') return matchesSearch;
 
     const matchesSupplier = selectedSupplier === 'all' || product.supplier === selectedSupplier;
     const matchesCountry = selectedCountry === 'all' || (product.country && product.country.toLowerCase() === selectedCountry.toLowerCase());
@@ -2037,6 +2095,114 @@ const WineDistributorApp = () => {
 
               {!collapsedSections.catalog && (
                 <div className="animate-in fade-in duration-500">
+                  <div className="mb-10" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setIsCreatingProduct(!isCreatingProduct)}
+                      className={`flex items-center space-x-2 px-6 py-3 rounded-2xl font-bold text-xs transition-all shadow-lg active:scale-95 ${isCreatingProduct ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-rose-600 text-white hover:bg-rose-700'}`}
+                    >
+                      {isCreatingProduct ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                      <span>{isCreatingProduct ? 'Cancel' : 'Create Product'}</span>
+                    </button>
+
+                    {isCreatingProduct && (
+                      <div className="mt-6 p-8 bg-slate-50/50 rounded-3xl border border-slate-200 animate-in slide-in-from-top-4 duration-300">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Supplier</label>
+                            <input
+                              type="text"
+                              value={newProductData.supplier}
+                              onChange={(e) => setNewProductData({ ...newProductData, supplier: e.target.value })}
+                              placeholder="e.g. Rosenthal Wine Merchant"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm font-medium"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Producer</label>
+                            <input
+                              type="text"
+                              value={newProductData.producer}
+                              onChange={(e) => setNewProductData({ ...newProductData, producer: e.target.value })}
+                              placeholder="e.g. Georges Lignier"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm font-medium"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Product Type</label>
+                            <select
+                              value={newProductData.productType}
+                              onChange={(e) => setNewProductData({ ...newProductData, productType: e.target.value })}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm font-medium appearance-none"
+                            >
+                              <option value="wine">Wine</option>
+                              <option value="spirits">Spirits</option>
+                              <option value="non-alcoholic">Non-Alcoholic</option>
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Item Name</label>
+                            <input
+                              type="text"
+                              value={newProductData.productName}
+                              onChange={(e) => setNewProductData({ ...newProductData, productName: e.target.value })}
+                              placeholder="e.g. Morey-Saint-Denis"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm font-medium"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Item Code</label>
+                            <input
+                              type="text"
+                              value={newProductData.itemCode}
+                              onChange={(e) => setNewProductData({ ...newProductData, itemCode: e.target.value })}
+                              placeholder="e.g. GLMSD22"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm font-medium font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Bottle Size (ml)</label>
+                            <input
+                              type="text"
+                              value={newProductData.bottleSize}
+                              onChange={(e) => setNewProductData({ ...newProductData, bottleSize: e.target.value })}
+                              placeholder="750"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm font-medium"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Pack Size</label>
+                            <input
+                              type="number"
+                              value={newProductData.packSize}
+                              onChange={(e) => setNewProductData({ ...newProductData, packSize: e.target.value })}
+                              placeholder="12"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm font-medium"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">FOB Case ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={newProductData.fobCasePrice}
+                              onChange={(e) => setNewProductData({ ...newProductData, fobCasePrice: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-mono text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-8 flex justify-end">
+                          <button
+                            onClick={handleQuickCreateProduct}
+                            className="flex items-center space-x-2 px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold text-xs hover:bg-slate-800 transition-all shadow-lg active:scale-95 group"
+                          >
+                            <ListPlus className="w-4 h-4 text-rose-400 group-hover:text-rose-300 transition-colors" />
+                            <span>Add to Catalog</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   {filteredProducts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 bg-slate-50/30 rounded-2xl border border-dashed border-slate-200">
                       <Search className="w-12 h-12 text-slate-300 mb-4" />
