@@ -296,6 +296,20 @@ app.post('/api/upload/pdf', upload.single('pdf'), (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`Persistence server running at http://localhost:${PORT}`);
+// --- Production Static File Serving ---
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, 'build')));
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
+// Use process.env.PORT for deployment platform compatibility
+const SERVER_PORT = process.env.PORT || PORT;
+
+app.listen(SERVER_PORT, () => {
+    console.log(`Server running at http://localhost:${SERVER_PORT}`);
 });

@@ -16,10 +16,13 @@
     "react-dom": "^18.2.0",
     "xlsx": "^0.18.5"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "node server.js",
+    "dev": "concurrently \"react-scripts start\" \"npm run server\"",
     "server": "node server.js",
-    "dev": "concurrently \"npm start\" \"npm run server\"",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
     "build": "react-scripts build",
