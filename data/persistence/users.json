@@ -1,120 +1,27 @@
 [
   {
     "id": "user-1769562272835",
-    "username": "treys",
+    "username": "Trey",
     "password": "Richelieu",
     "type": "admin",
     "isSuperAdmin": true,
-    "email": "trey.stephenson@gmail.com"
+    "email": "trey@aoc-tn.com"
   },
   {
     "id": "user-1769562389315",
     "username": "customer",
     "password": "troubleshoot",
-    "type": "customer"
-  },
-  {
-    "id": "user-1769563045495",
-    "username": "cart-user",
-    "password": "pass",
-    "type": "customer"
-  },
-  {
-    "id": "user-1769564415345",
-    "username": "adminuser777",
-    "password": "adminpassword777",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769565823852",
-    "username": "adminuser999adminuser777adminuser777",
-    "password": "adminpassword999adminpassword777admadminpassword777inpassword777",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769618035175",
-    "username": "admin_test",
-    "password": "password",
-    "type": "customer"
-  },
-  {
-    "id": "user-1769618119882",
-    "username": "admin_testtest_admin_verified",
-    "password": "password",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769619106930",
-    "username": "cust_list_test_2",
-    "password": "password",
-    "type": "customer"
-  },
-  {
-    "id": "user-1769619174325",
-    "username": "admin_list_test_2",
-    "password": "password",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769620292244",
-    "username": "final_customer",
-    "password": "password",
-    "type": "customer"
-  },
-  {
-    "id": "user-1769620410632",
-    "username": "final_adminfinal_customer",
-    "password": "passwordpassword",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769620963612",
-    "username": "test_sync_1",
-    "password": "password123",
-    "type": "customer"
-  },
-  {
-    "id": "user-1769621003774",
-    "username": "test_sync_admintest_sync_1",
-    "password": "adminpass123password123",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769621323976",
-    "username": "test_sync_admin",
-    "password": "password123adminpass123",
-    "type": "admin"
+    "type": "customer",
+    "accessRevoked": false,
+    "email": "customer@example.com"
   },
   {
     "id": "user-1769622224807",
     "username": "bug_customer",
     "password": "password",
     "type": "customer",
-    "accessRevoked": false
-  },
-  {
-    "id": "user-1769622263882",
-    "username": "bug_customerbug_admin",
-    "password": "passwordpassword",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769622885493",
-    "username": "bug_admin",
-    "password": "password",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769623820468",
-    "username": "admin-test",
-    "password": "password",
-    "type": "admin"
-  },
-  {
-    "id": "user-1769630579434",
-    "username": "Bugsy Wine Bar",
-    "password": "password",
-    "type": "customer"
+    "accessRevoked": false,
+    "email": "bug_customer@example.com"
   },
   {
     "id": "user-1769658304790",
@@ -128,7 +35,8 @@
     "username": "new_admin_candidate",
     "password": "password",
     "type": "admin",
-    "email": "test@example.com"
+    "email": "test@example.com",
+    "accessRevoked": true
   },
   {
     "id": "user-1769688801637",
@@ -153,17 +61,10 @@
     "email": "admin@aocwines.com"
   },
   {
-    "id": "user-1769930374685",
-    "username": "adminadmin",
-    "password": "",
+    "id": "user-1770141066551",
+    "username": "FinalTestUser",
+    "password": "password123",
     "type": "customer",
-    "email": ""
-  },
-  {
-    "id": "user-1769930458536",
-    "username": "",
-    "password": "",
-    "type": "customer",
-    "email": ""
+    "email": "final.test.user@example.com"
   }
 ]

@@ -77,6 +77,15 @@ app.post('/api/auth/signup', (req, res) => {
         return res.status(400).json({ error: 'User already exists' });
     }
 
+    // Check if email is associated with a revoked account or existing account
+    const existingUserWithEmail = users.find(u => u.email === email);
+    if (existingUserWithEmail) {
+        if (existingUserWithEmail.accessRevoked) {
+            return res.status(403).json({ error: 'This email is associated with a revoked account.' });
+        }
+        return res.status(400).json({ error: 'Email already exists' });
+    }
+
     // Strictly enforce customer type for all new signups
     const newUser = { id: `user-${Date.now()}`, username, password, type: 'customer', email };
     users.push(newUser);

@@ -145,7 +145,9 @@ const WineDistributorApp = () => {
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
   const [authMessage, setAuthMessage] = useState('');
+  const [showRevokedUsers, setShowRevokedUsers] = useState(false);
 
   // Load data from storage on mount
   useEffect(() => {
@@ -1848,6 +1850,17 @@ const WineDistributorApp = () => {
 
                 {!collapsedSections.team && (
                   <div className="animate-in fade-in duration-500">
+                    <div className="flex justify-end mb-4 px-1">
+                      <label className="flex items-center space-x-2 text-xs font-bold text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transaction-colors">
+                        <input
+                          type="checkbox"
+                          checked={showRevokedUsers}
+                          onChange={(e) => setShowRevokedUsers(e.target.checked)}
+                          className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                        />
+                        <span>Show Revoked Users</span>
+                      </label>
+                    </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
                         <thead className="dark:bg-slate-800/50">
@@ -1859,56 +1872,63 @@ const WineDistributorApp = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                          {allUsers.map((user) => (
-                            <tr key={user.id} className="group hover:bg-slate-50/30 dark:hover:bg-slate-800/30 transition-colors">
-                              <td className="py-4 pl-1 font-extrabold text-slate-900 dark:text-white text-sm">
-                                <div className="flex items-center gap-2">
-                                  {user.username}
-                                  {user.accessRevoked && (
-                                    <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 text-[8px] font-black uppercase tracking-tighter border border-amber-100">
-                                      Revoked
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="py-4 text-slate-500 dark:text-slate-400 text-xs font-medium">{user.email || '-'}</td>
-                              <td className="py-4 text-center">
-                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${user.type === 'admin'
-                                  ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900'
-                                  : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700'
-                                  }`}>
-                                  {user.type}
-                                </span>
-                              </td>
-                              <td className="py-4 pr-1 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  {user.id !== currentUser.id && (
-                                    <>
-                                      <button
-                                        onClick={() => updateUserRole(user.id, user.type === 'admin' ? 'customer' : 'admin')}
-                                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-200 border ${user.type === 'admin'
-                                          ? 'text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-                                          : 'text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-900/20'
-                                          }`}
-                                      >
-                                        {user.type === 'admin' ? 'Revoke Admin' : 'Make Admin'}
-                                      </button>
-                                      <button
-                                        onClick={() => toggleUserAccess(user.id, !user.accessRevoked)}
-                                        disabled={user.username === 'treys'}
-                                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-200 border ${user.accessRevoked
-                                          ? 'text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                                          : 'text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-30 disabled:hover:bg-transparent'
-                                          }`}
-                                      >
-                                        {user.accessRevoked ? 'Restore Access' : 'Revoke Access'}
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                          {allUsers
+                            .filter(user => showRevokedUsers || !user.accessRevoked)
+                            .map((user) => (
+                              <tr key={user.id} className="group hover:bg-slate-50/30 dark:hover:bg-slate-800/30 transition-colors">
+                                <td className="py-4 pl-1 font-extrabold text-slate-900 dark:text-white text-sm">
+                                  <div className="flex items-center gap-2">
+                                    {user.username}
+                                    {user.accessRevoked && (
+                                      <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 text-[8px] font-black uppercase tracking-tighter border border-amber-100">
+                                        Revoked
+                                      </span>
+                                    )}
+                                    {user.isSuperAdmin && (
+                                      <span className="px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300 text-[8px] font-black uppercase tracking-tighter border border-violet-100 dark:border-violet-800">
+                                        Super Admin
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-4 text-slate-500 dark:text-slate-400 text-xs font-medium">{user.email || '-'}</td>
+                                <td className="py-4 text-center">
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${user.type === 'admin'
+                                    ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900'
+                                    : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700'
+                                    }`}>
+                                    {user.type}
+                                  </span>
+                                </td>
+                                <td className="py-4 pr-1 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    {user.id !== currentUser.id && (
+                                      <>
+                                        <button
+                                          onClick={() => updateUserRole(user.id, user.type === 'admin' ? 'customer' : 'admin')}
+                                          className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-200 border ${user.type === 'admin'
+                                            ? 'text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                            : 'text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-900/20'
+                                            }`}
+                                        >
+                                          {user.type === 'admin' ? 'Revoke Admin' : 'Make Admin'}
+                                        </button>
+                                        <button
+                                          onClick={() => toggleUserAccess(user.id, !user.accessRevoked)}
+                                          disabled={user.username === 'treys'}
+                                          className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-200 border ${user.accessRevoked
+                                            ? 'text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                                            : 'text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/30 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-30 disabled:hover:bg-transparent'
+                                            }`}
+                                        >
+                                          {user.accessRevoked ? 'Restore Access' : 'Revoke Access'}
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </div>
