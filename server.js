@@ -169,6 +169,27 @@ app.patch('/api/auth/users/:id/role', (req, res) => {
     res.json({ success: true, user: { id: users[userIndex].id, type: users[userIndex].type } });
 });
 
+app.patch('/api/auth/users/:id/password', (req, res) => {
+    const { id } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+        return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.id === id);
+
+    if (userIndex === -1) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+
+    users[userIndex].password = password;
+    saveUsers(users);
+
+    res.json({ success: true, message: 'Password updated successfully' });
+});
+
 app.post('/api/auth/forgot-password', (req, res) => {
     const { email } = req.body;
     const users = getUsers();

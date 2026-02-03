@@ -58,8 +58,8 @@
   {
     "id": "user-1769740762551",
     "username": "Admin",
-    "password": "password",
-    "type": "customer",
+    "password": "Admin",
+    "type": "admin",
     "email": "admin@aocwines.com"
   },
   {

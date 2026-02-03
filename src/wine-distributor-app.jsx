@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink, LayoutGrid, List, Sun, Moon } from 'lucide-react';
+import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink, LayoutGrid, List, Sun, Moon, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const WineDistributorApp = () => {
@@ -148,6 +148,10 @@ const WineDistributorApp = () => {
 
   const [authMessage, setAuthMessage] = useState('');
   const [showRevokedUsers, setShowRevokedUsers] = useState(false);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState(null);
+  const [adminNewPassword, setAdminNewPassword] = useState('');
+  const [teamSearchTerm, setTeamSearchTerm] = useState('');
+  const [teamSortConfig, setTeamSortConfig] = useState({ key: 'username', direction: 'asc' });
 
   // Load data from storage on mount
   useEffect(() => {
@@ -407,6 +411,68 @@ const WineDistributorApp = () => {
     } catch (error) {
       console.error('Failed to update access:', error);
     }
+  };
+
+  const handleAdminUpdatePassword = async () => {
+    if (!resetPasswordUserId || !adminNewPassword) return;
+
+    try {
+      const response = await fetch(`/api/auth/users/${resetPasswordUserId}/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminNewPassword })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUploadStatus('Password updated successfully');
+        setResetPasswordUserId(null);
+        setAdminNewPassword('');
+        setTimeout(() => setUploadStatus(''), 3000);
+      } else {
+        alert(data.error || 'Failed to update password');
+      }
+    } catch (error) {
+      console.error('Failed to update password:', error);
+      alert('Server connection failed');
+    }
+  };
+
+  const filteredAndSortedUsers = React.useMemo(() => {
+    let users = [...allUsers];
+
+    // Filter
+    if (teamSearchTerm) {
+      const lowerTerm = teamSearchTerm.toLowerCase();
+      users = users.filter(u =>
+        u.username.toLowerCase().includes(lowerTerm) ||
+        (u.email && u.email.toLowerCase().includes(lowerTerm))
+      );
+    }
+
+    // Sort
+    if (teamSortConfig.key) {
+      users.sort((a, b) => {
+        let aValue = a[teamSortConfig.key] || '';
+        let bValue = b[teamSortConfig.key] || '';
+
+        // Handle special cases if any, but string comparison should suffice for username/email/type
+        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+        if (aValue < bValue) return teamSortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return teamSortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return users;
+  }, [allUsers, teamSearchTerm, teamSortConfig]);
+
+  const handleTeamSort = (key) => {
+    setTeamSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
   };
 
   const handleLogout = () => {
@@ -1850,7 +1916,19 @@ const WineDistributorApp = () => {
 
                 {!collapsedSections.team && (
                   <div className="animate-in fade-in duration-500">
-                    <div className="flex justify-end mb-4 px-1">
+                    <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-6 px-1 gap-4">
+                      {/* Search Input */}
+                      <div className="relative w-full md:w-64">
+                        <input
+                          type="text"
+                          value={teamSearchTerm}
+                          onChange={(e) => setTeamSearchTerm(e.target.value)}
+                          placeholder="Search users..."
+                          className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400"
+                        />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                      </div>
+
                       <label className="flex items-center space-x-2 text-xs font-bold text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transaction-colors">
                         <input
                           type="checkbox"
@@ -1865,14 +1943,44 @@ const WineDistributorApp = () => {
                       <table className="w-full text-left">
                         <thead className="dark:bg-slate-800/50">
                           <tr className="border-b border-slate-50 dark:border-slate-800">
-                            <th className="pb-4 pl-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Username</th>
-                            <th className="pb-4 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Email</th>
-                            <th className="pb-4 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">Current Role</th>
+                            <th
+                              className="pb-4 pl-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest cursor-pointer hover:text-rose-500 transition-colors group"
+                              onClick={() => handleTeamSort('username')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Username
+                                {teamSortConfig.key === 'username' && (
+                                  teamSortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                                )}
+                              </div>
+                            </th>
+                            <th
+                              className="pb-4 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest cursor-pointer hover:text-rose-500 transition-colors"
+                              onClick={() => handleTeamSort('email')}
+                            >
+                              <div className="flex items-center gap-1">
+                                Email
+                                {teamSortConfig.key === 'email' && (
+                                  teamSortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                                )}
+                              </div>
+                            </th>
+                            <th
+                              className="pb-4 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center cursor-pointer hover:text-rose-500 transition-colors"
+                              onClick={() => handleTeamSort('type')}
+                            >
+                              <div className="flex items-center justify-center gap-1">
+                                Current Role
+                                {teamSortConfig.key === 'type' && (
+                                  teamSortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+                                )}
+                              </div>
+                            </th>
                             <th className="pb-4 pr-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                          {allUsers
+                          {filteredAndSortedUsers
                             .filter(user => showRevokedUsers || !user.accessRevoked)
                             .map((user) => (
                               <tr key={user.id} className="group hover:bg-slate-50/30 dark:hover:bg-slate-800/30 transition-colors">
@@ -1922,6 +2030,15 @@ const WineDistributorApp = () => {
                                             }`}
                                         >
                                           {user.accessRevoked ? 'Restore Access' : 'Revoke Access'}
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setResetPasswordUserId(user.id);
+                                            setAdminNewPassword('');
+                                          }}
+                                          className="px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
+                                        >
+                                          Reset Password
                                         </button>
                                       </>
                                     )}
@@ -2771,6 +2888,50 @@ const WineDistributorApp = () => {
                     >
                       <span>Proceed to Column Mapping</span>
                       <ChevronRight className="w-4 h-4 inline-block ml-2 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Admin Password Reset Modal */}
+            {resetPasswordUserId && (
+              <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-[0_32px_128px_-16px_rgba(0,0,0,0.15)] max-w-md w-full overflow-hidden border border-white/50 dark:border-slate-800 animate-in zoom-in-95 duration-300">
+                  <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-[#faf9f6]/50 dark:bg-slate-800/20">
+                    <div>
+                      <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Reset Password</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        For user: {allUsers.find(u => u.id === resetPasswordUserId)?.username}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setResetPasswordUserId(null);
+                        setAdminNewPassword('');
+                      }}
+                      className="p-3 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-2xl transition-all border border-transparent dark:border-slate-700 hover:border-slate-100 shadow-sm"
+                    >
+                      <X className="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                    </button>
+                  </div>
+                  <div className="p-8 space-y-6">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">New Password</label>
+                      <input
+                        type="texxt"
+                        value={adminNewPassword}
+                        onChange={(e) => setAdminNewPassword(e.target.value)}
+                        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-mono text-sm text-slate-900 dark:text-white"
+                        placeholder="Enter new password..."
+                      />
+                    </div>
+                    <button
+                      onClick={handleAdminUpdatePassword}
+                      disabled={!adminNewPassword}
+                      className="w-full bg-[#1a1a1a] dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-slate-100 transition-all duration-300 shadow-xl shadow-slate-200 dark:shadow-none active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Update Password
                     </button>
                   </div>
                 </div>
