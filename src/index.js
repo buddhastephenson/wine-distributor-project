@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import WineDistributorApp from './wine-distributor-app';
 
 // window.storage polyfill for localStorage and Backend persistence
-const API_URL = 'http://localhost:3001/api/storage';
+const API_URL = '/api/storage';
 
 window.storage = {
     get: async (key) => {

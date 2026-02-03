@@ -28,7 +28,9 @@
     "username": "Trey's House",
     "password": "LongAve",
     "type": "customer",
-    "email": "trey.stephenson@gmail.com"
+    "email": "trey.stephenson@gmail.com",
+    "resetToken": "p27r5iibblcnn48przsz4",
+    "resetTokenExpiry": 1770145247521
   },
   {
     "id": "user-1769658799947",

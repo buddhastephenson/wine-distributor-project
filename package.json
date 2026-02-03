@@ -4,6 +4,7 @@
   "description": "Wine distribution management system for AOC Wines",
   "private": true,
   "homepage": ".",
+  "proxy": "http://localhost:3001",
   "dependencies": {
     "body-parser": "^2.2.2",
     "concurrently": "^9.2.1",

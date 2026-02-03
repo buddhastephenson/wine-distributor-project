@@ -203,7 +203,7 @@ const WineDistributorApp = () => {
 
       // Load Taxonomy
       try {
-        const taxonomyResponse = await fetch('http://localhost:3001/api/storage/taxonomy');
+        const taxonomyResponse = await fetch('/api/storage/taxonomy');
         if (taxonomyResponse.ok) {
           const taxonomyData = await taxonomyResponse.json();
           if (taxonomyData && taxonomyData.value) {
@@ -261,7 +261,7 @@ const WineDistributorApp = () => {
     e.preventDefault();
     setAuthError('');
     try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: authUsername, password: authPassword })
@@ -289,7 +289,7 @@ const WineDistributorApp = () => {
     e.preventDefault();
     setAuthError('');
     try {
-      const response = await fetch('http://localhost:3001/api/auth/signup', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -316,7 +316,7 @@ const WineDistributorApp = () => {
     setAuthError('');
     setAuthMessage('');
     try {
-      const response = await fetch('http://localhost:3001/api/auth/forgot-password', {
+      const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: authEmail })
@@ -340,7 +340,7 @@ const WineDistributorApp = () => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:3001/api/auth/reset-password', {
+      const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: resetToken, password: newPassword })
@@ -363,7 +363,7 @@ const WineDistributorApp = () => {
 
   const fetchAllUsers = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/auth/users');
+      const response = await fetch('/api/auth/users');
       const data = await response.json();
       setAllUsers(data);
     } catch (error) {
@@ -373,7 +373,7 @@ const WineDistributorApp = () => {
 
   const updateUserRole = async (userId, newRole) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/auth/users/${userId}/role`, {
+      const response = await fetch(`/api/auth/users/${userId}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: newRole })
@@ -391,7 +391,7 @@ const WineDistributorApp = () => {
 
   const toggleUserAccess = async (userId, accessRevoked) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/auth/users/${userId}/access`, {
+      const response = await fetch(`/api/auth/users/${userId}/access`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accessRevoked })
@@ -574,7 +574,7 @@ const WineDistributorApp = () => {
         formData.append('pdf', file);
 
         try {
-          const response = await fetch('http://localhost:3001/api/upload/pdf', {
+          const response = await fetch('/api/upload/pdf', {
             method: 'POST',
             body: formData,
           });
@@ -1375,7 +1375,7 @@ const WineDistributorApp = () => {
               <Wine className="w-10 h-10 text-rose-600 dark:text-rose-400" />
             </div>
             <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
-              AOC Wines
+              AOC Special Orders
             </h1>
             <p className="text-slate-500 dark:text-slate-400 font-medium tracking-wide uppercase text-xs">
               {view === 'login' ? (authMode === 'login' ? 'Partner Portal' : 'Create Account') :
@@ -1590,7 +1590,7 @@ const WineDistributorApp = () => {
                   <Wine className="w-6 h-6 text-rose-600" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">AOC Wines</h1>
+                  <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">AOC Special Orders</h1>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-1">Admin Dashboard</p>
                 </div>
               </div>
@@ -3257,7 +3257,7 @@ const WineDistributorApp = () => {
                   <Wine className="w-6 h-6 text-rose-600" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">AOC Wines</h1>
+                  <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">AOC Special Orders</h1>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-1">Exclusive Partner Catalog</p>
                 </div>
               </div>
