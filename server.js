@@ -124,12 +124,27 @@ app.post('/api/storage/:key', async (req, res) => {
 
         if (key === 'wine-products') {
             // For bulk saves (e.g. imports), we still support this, but optimized
-            // Note: Frontend refactor effectively stops calling this for single edits
+            // 1. Identify IDs in the new payload
+            const incomingIds = data.map(item => item.id);
+
+            // 2. Delete items in DB that are NOT in the payload (Sync deletion)
+            await Product.deleteMany({ id: { $nin: incomingIds } });
+
+            // 3. Upsert items from payload
             for (const item of data) {
                 await Product.findOneAndUpdate({ id: item.id }, item, { upsert: true });
             }
         } else if (key === 'wine-special-orders') {
             // data is { "username": [orders...] }
+
+            // 1. Flatten all orders to get all IDs
+            const allOrders = Object.values(data).flat();
+            const incomingIds = allOrders.map(order => order.id);
+
+            // 2. Delete orders in DB that are NOT in the payload
+            await SpecialOrder.deleteMany({ id: { $nin: incomingIds } });
+
+            // 3. Upsert items
             for (const username of Object.keys(data)) {
                 const userOrders = data[username];
                 for (const order of userOrders) {
