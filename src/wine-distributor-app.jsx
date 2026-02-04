@@ -1310,8 +1310,12 @@ const WineDistributorApp = () => {
           'Status': item.status || 'Requested',
           'Admin Comments': item.adminNotes || '',
           'Notes': item.notes || '',
+          'Status': item.status || 'Requested',
+          'Admin Comments': item.adminNotes || '',
+          'Notes': item.notes || '',
           '_username': username,
-          '_item_id': item.id
+          '_item_id': item.id,
+          '_synced_status': item.status || 'Requested' // Snapshot of status at export time
         });
       });
     });
@@ -1356,6 +1360,18 @@ const WineDistributorApp = () => {
           if (username && itemId && updatedAllLists[username]) {
             updatedAllLists[username] = updatedAllLists[username].map(item => {
               if (item.id === itemId) {
+                // Concurrency Check:
+                // Only update if the user EXPLICITLY changed the status in the spreadsheet
+                // (compared to the value synced at export time).
+                // If _synced_status is missing (legacy file), we assume it's a change or force update.
+                const syncedStatus = row['_synced_status'];
+                const statusChangedInFile = !syncedStatus || (String(syncedStatus).trim() !== String(newStatus || '').trim());
+
+                if (!statusChangedInFile) {
+                  // User did not edit this cell, so do not overwrite DB with potentially stale data
+                  return item;
+                }
+
                 updateCount++;
                 let status = (newStatus && newStatus.trim()) || item.status;
 
