@@ -4,6 +4,7 @@ const SpecialOrderSchema = new mongoose.Schema({
     id: { type: String, required: true, unique: true },
     username: { type: String, required: true, index: true }, // Links to User.username
     itemCode: { type: String, required: true },
+    productId: { type: String }, // Links to Product.id (original source)
     producer: { type: String },
     productName: { type: String },
     vintage: { type: String },

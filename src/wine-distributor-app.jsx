@@ -446,8 +446,14 @@ const WineDistributorApp = () => {
       });
       const data = await response.json();
       if (data.success) {
+        const updatedAllLists = { ...allCustomerLists };
+        delete updatedAllLists[allUsers.find(u => u.id === userId)?.username];
+
         setAllUsers(prev => prev.filter(u => u.id !== userId));
-        setUploadStatus('User deleted successfully');
+        setAllCustomerLists(updatedAllLists);
+        await saveSpecialOrderLists(updatedAllLists);
+
+        setUploadStatus('User and associated lists deleted successfully');
         setTimeout(() => setUploadStatus(''), 3000);
       } else {
         alert(data.error || 'Failed to delete user');
@@ -972,7 +978,8 @@ const WineDistributorApp = () => {
   const addToList = async (product) => {
     const username = currentUser.username;
     const currentItems = allCustomerLists[username] || [];
-    const existing = currentItems.find(item => item.id === product.id);
+    // Check for existing by productId (new) or id (legacy)
+    const existing = currentItems.find(item => (item.productId === product.id) || (item.id === product.id));
 
     if (existing) {
       setSpecialOrderList(currentItems);
@@ -980,8 +987,15 @@ const WineDistributorApp = () => {
       return;
     } else {
       const packSize = parseInt(product.packSize) || 12;
+
+      // Generate unique ID for this specific request item
+      // Format: req-<username>-<timestamp>-<random>
+      const uniqueRequestId = `req-${username}-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 5)}`;
+
       const newList = [...currentItems, {
         ...product,
+        id: uniqueRequestId,
+        productId: product.id, // Store reference to original product
         cases: 1,
         bottles: 0,
         quantity: packSize,
@@ -1958,7 +1972,7 @@ const WineDistributorApp = () => {
                   ) : (
                     <div className="flex flex-col space-y-3">
                       {Object.entries(allCustomerLists)
-                        .filter(([_, items]) => items.length > 0)
+                        .filter(([username, items]) => items.length > 0 && allUsers.some(u => u.username === username))
                         .sort(([a], [b]) => a.localeCompare(b))
                         .map(([username, items]) => {
                           const total = items.reduce((sum, item) => sum + (parseFloat(item.frontlinePrice) * item.quantity), 0).toFixed(2);
