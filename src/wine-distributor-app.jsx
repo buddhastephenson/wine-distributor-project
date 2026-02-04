@@ -3280,7 +3280,14 @@ const WineDistributorApp = () => {
                         </div>
                         <h3 className="font-extrabold text-2xl text-slate-900 tracking-tight leading-tight group-hover:text-rose-600 transition-colors uppercase">{product.producer}</h3>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 mb-2">
-                          <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest">{product.supplier}</p>
+                          <div className="flex justify-between items-center w-full">
+                            <p className="text-[10px] text-rose-500 font-bold uppercase tracking-widest">{product.supplier}</p>
+                            {product.uploadDate && (
+                              <p className="text-[9px] text-slate-300 font-bold uppercase tracking-wider">
+                                Updated: {new Date(product.uploadDate).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
                           {(product.country || product.region) && (
                             <p className="text-[10px] text-slate-400 font-black uppercase tracking-tight">
                               <span className="text-slate-200 mx-1.5">•</span>
@@ -3369,6 +3376,11 @@ const WineDistributorApp = () => {
                               <div>
                                 <p className="font-extrabold text-slate-900 group-hover:text-rose-600 transition-colors uppercase tracking-tight">{product.producer}</p>
                                 <p className="text-xs text-slate-400 font-medium">{product.productName}</p>
+                                {product.uploadDate && (
+                                  <p className="text-[9px] text-slate-300 font-bold uppercase tracking-wider mt-1">
+                                    Updated: {new Date(product.uploadDate).toLocaleDateString()}
+                                  </p>
+                                )}
                               </div>
                             </td>
                             <td className="py-4 px-6">
