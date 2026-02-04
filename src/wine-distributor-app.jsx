@@ -506,11 +506,15 @@ const WineDistributorApp = () => {
 
   const calculateFrontlinePrice = (product) => {
     const productType = (product.productType || 'wine').toLowerCase();
+    const productName = (product.productName || '').toLowerCase();
     let formula = formulas.wine;
 
-    if (productType.includes('spirit') || productType.includes('liquor') || productType.includes('vodka') || productType.includes('whiskey') || productType.includes('whisky') || productType.includes('bourbon') || productType.includes('rum') || productType.includes('gin') || productType.includes('tequila')) {
+    // Helper to check keywords in either field
+    const isType = (keywords) => keywords.some(k => productType.includes(k) || productName.includes(k));
+
+    if (isType(['spirit', 'liquor', 'vodka', 'whiskey', 'whisky', 'bourbon', 'rum', 'gin', 'tequila', 'mezcal', 'brandy', 'cognac', 'amaro', 'vermouth'])) {
       formula = formulas.spirits;
-    } else if (productType.includes('non-alc') || productType.includes('na ') || productType.includes('juice') || productType.includes('soda') || productType.includes('non alc')) {
+    } else if (isType(['non-alc', 'na ', 'juice', 'soda', 'non alc', 'water', 'tea', 'coffee'])) {
       formula = formulas.nonAlcoholic;
     }
 

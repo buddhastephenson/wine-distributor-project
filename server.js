@@ -6,15 +6,22 @@ const path = require('path');
 const { exec } = require('child_process');
 const multer = require('multer');
 const XLSX = require('xlsx');
+const mongoose = require('mongoose');
+
+// DB Connection
+const connectDB = require('./src/db/connect');
+const User = require('./src/models/User');
+const Product = require('./src/models/Product');
+const SpecialOrder = require('./src/models/SpecialOrder');
+const Taxonomy = require('./src/models/Taxonomy');
 
 const app = express();
-const PORT = 3001;
-const DATA_DIR = path.join(__dirname, 'data', 'persistence');
+// Use process.env.PORT for deployment platform compatibility
+const SERVER_PORT = process.env.PORT || 3001;
 
-// Ensure directories exist
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+// Connect to Database
+connectDB();
+
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -25,130 +32,193 @@ const upload = multer({ dest: 'uploads/' });
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 
-app.get('/api/storage/:key', (req, res) => {
-    const key = req.params.key;
-    const filePath = path.join(DATA_DIR, `${key}.json`);
+// --- Storage Endpoints (Legacy Adapter) ---
+// Frontend expects { value: "JSON_STRING" } structure. 
+// We are mimicking this by querying DB and stringifying result.
 
-    if (fs.existsSync(filePath)) {
-        try {
-            const data = fs.readFileSync(filePath, 'utf8');
-            res.json({ value: data });
-        } catch (error) {
-            res.status(500).json({ error: 'Failed to read data' });
+app.get('/api/storage/:key', async (req, res) => {
+    const key = req.params.key;
+
+    try {
+        let result = null;
+
+        if (key === 'wine-products') {
+            const products = await Product.find({}, '-_id -__v -createdAt -updatedAt').lean();
+            result = products; // Frontend expects array of products
+        } else if (key === 'wine-special-orders') {
+            // Frontend expects { "username": [order1, order2], ... }
+            const allOrders = await SpecialOrder.find({}, '-_id -__v -createdAt -updatedAt').lean();
+            const grouped = {};
+            for (const order of allOrders) {
+                if (!grouped[order.username]) grouped[order.username] = [];
+                // Remove username from object to match legacy structure if needed, 
+                // but keeping it doesn't hurt.
+                grouped[order.username].push(order);
+            }
+            result = grouped;
+        } else if (key === 'taxonomy') {
+            const taxDoc = await Taxonomy.findOne({ name: 'main_taxonomy' });
+            result = taxDoc ? taxDoc.data : {};
+        } else {
+            // For other keys (e.g., wine-order-notes), return empty or handle if crucial
+            // Currently returning null to signify not found/implemented
+            // Returning 404 might break frontend if it expects something, checking frontend logic it warns but continues.
+            return res.status(404).json({ error: 'Key not handled in DB migration' });
         }
-    } else {
-        res.status(404).json({ error: 'Key not found' });
+
+        // Maintain legacy contract: { value: stringified_json }
+        res.json({ value: JSON.stringify(result) });
+
+    } catch (error) {
+        console.error(`Error reading key ${key}:`, error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-app.post('/api/storage/:key', (req, res) => {
+app.post('/api/storage/:key', async (req, res) => {
     const key = req.params.key;
-    const { value } = req.body;
-    const filePath = path.join(DATA_DIR, `${key}.json`);
+    const { value } = req.body; // value is a JSON string
 
     try {
-        fs.writeFileSync(filePath, value, 'utf8');
+        const data = JSON.parse(value);
+
+        if (key === 'wine-products') {
+            // Full replace logic (optimizable later)
+            // Strategy: Upsert each item. 
+            // Warning: This is heavy if value is huge 8MB file. 
+            // Better to just update what changed if possible, but frontend sends WHOLE list.
+            // For now, we will process upserts in a loop.
+
+            // Note: Ideally allow frontend to patch, but for now we sync.
+            // To prevent stale data accumulation, we might need to delete ones not in list?
+            // "I want it built right" -> Deleting missing is dangerous without transaction.
+            // Let's rely on upsert for now.
+
+            for (const item of data) {
+                await Product.findOneAndUpdate({ id: item.id }, item, { upsert: true });
+            }
+            // TODO: Handle deletion of products removed from frontend list?
+
+        } else if (key === 'wine-special-orders') {
+            // data is { "username": [orders...] }
+            // We need to sync this.
+
+            for (const username of Object.keys(data)) {
+                const userOrders = data[username];
+                for (const order of userOrders) {
+                    await SpecialOrder.findOneAndUpdate(
+                        { id: order.id },
+                        { ...order, username },
+                        { upsert: true }
+                    );
+                }
+            }
+        } else if (key === 'taxonomy') {
+            await Taxonomy.findOneAndUpdate({ name: 'main_taxonomy' }, { data }, { upsert: true });
+        }
+
         res.json({ success: true });
     } catch (error) {
+        console.error(`Error saving key ${key}:`, error);
         res.status(500).json({ error: 'Failed to save data' });
     }
 });
 
-// --- Auth Endpoints ---
+// --- Auth Endpoints (Mongoose) ---
 
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
+app.post('/api/auth/signup', async (req, res) => {
+    const { username, password, email } = req.body;
 
-const getUsers = () => {
-    if (fs.existsSync(USERS_FILE)) {
-        return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-    }
-    return [];
-};
+    try {
+        const existingUser = await User.findOne({
+            $or: [{ username }, { email }]
+        });
 
-const saveUsers = (users) => {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
-};
-
-app.post('/api/auth/signup', (req, res) => {
-    const { username, password, email } = req.body; // Ignore 'type' from client
-    const users = getUsers();
-
-    if (users.find(u => u.username === username)) {
-        return res.status(400).json({ error: 'User already exists' });
-    }
-
-    // Check if email is associated with a revoked account or existing account
-    const existingUserWithEmail = users.find(u => u.email === email);
-    if (existingUserWithEmail) {
-        if (existingUserWithEmail.accessRevoked) {
-            return res.status(403).json({ error: 'This email is associated with a revoked account.' });
+        if (existingUser) {
+            if (existingUser.email === email && existingUser.accessRevoked) {
+                return res.status(403).json({ error: 'This email is associated with a revoked account.' });
+            }
+            return res.status(400).json({ error: 'User or Email already exists' });
         }
-        return res.status(400).json({ error: 'Email already exists' });
+
+        const newUser = await User.create({
+            id: `user-${Date.now()}`,
+            username,
+            password,
+            type: 'customer',
+            email
+        });
+
+        res.json({
+            success: true,
+            user: { id: newUser.id, username, type: newUser.type, email }
+        });
+    } catch (error) {
+        console.error('Signup Error:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
-
-    // Strictly enforce customer type for all new signups
-    const newUser = { id: `user-${Date.now()}`, username, password, type: 'customer', email };
-    users.push(newUser);
-    saveUsers(users);
-
-    res.json({ success: true, user: { id: newUser.id, username, type: newUser.type, email } });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
-    const users = getUsers();
 
-    const user = users.find(u => u.username === username && u.password === password);
-    if (!user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+    try {
+        const user = await User.findOne({ username, password });
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        if (user.accessRevoked) {
+            return res.status(403).json({ error: 'Access Revoked. Please contact administrator.' });
+        }
+
+        res.json({
+            success: true,
+            user: {
+                id: user.id,
+                username: user.username,
+                type: user.type,
+                isSuperAdmin: !!user.isSuperAdmin
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal Server Error' });
     }
-
-    if (user.accessRevoked) {
-        return res.status(403).json({ error: 'Access Revoked. Please contact administrator.' });
-    }
-
-    res.json({ success: true, user: { id: user.id, username: user.username, type: user.type, isSuperAdmin: !!user.isSuperAdmin } });
 });
 
 // --- Admin User Management Endpoints ---
 
-app.get('/api/auth/users', (req, res) => {
-    const users = getUsers();
-    // Return users without sensitive password data
-    const safeUsers = users.map(u => ({
-        id: u.id,
-        username: u.username,
-        type: u.type,
-        email: u.email,
-        accessRevoked: !!u.accessRevoked,
-        isSuperAdmin: !!u.isSuperAdmin
-    }));
-    res.json(safeUsers);
+app.get('/api/auth/users', async (req, res) => {
+    try {
+        const users = await User.find({}, '-password -__v');
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
 });
 
-app.patch('/api/auth/users/:id/access', (req, res) => {
+app.patch('/api/auth/users/:id/access', async (req, res) => {
     const { id } = req.params;
     const { accessRevoked } = req.body;
 
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.id === id);
+    try {
+        const user = await User.findOne({ id });
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (userIndex === -1) {
-        return res.status(404).json({ error: 'User not found' });
+        if (user.username === 'treys') {
+            return res.status(403).json({ error: 'Access cannot be revoked for primary administrator "treys"' });
+        }
+
+        user.accessRevoked = !!accessRevoked;
+        await user.save();
+
+        res.json({ success: true, user: { id: user.id, accessRevoked: user.accessRevoked } });
+    } catch (error) {
+        res.status(500).json({ error: 'Update failed' });
     }
-
-    // Protection for 'treys' account
-    if (users[userIndex].username === 'treys') {
-        return res.status(403).json({ error: 'Access cannot be revoked for primary administrator "treys"' });
-    }
-
-    users[userIndex].accessRevoked = !!accessRevoked;
-    saveUsers(users);
-
-    res.json({ success: true, user: { id: users[userIndex].id, accessRevoked: users[userIndex].accessRevoked } });
 });
 
-app.patch('/api/auth/users/:id/role', (req, res) => {
+app.patch('/api/auth/users/:id/role', async (req, res) => {
     const { id } = req.params;
     const { type } = req.body;
 
@@ -156,98 +226,89 @@ app.patch('/api/auth/users/:id/role', (req, res) => {
         return res.status(400).json({ error: 'Invalid role type' });
     }
 
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.id === id);
+    try {
+        const user = await User.findOneAndUpdate({ id }, { type }, { new: true });
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (userIndex === -1) {
-        return res.status(404).json({ error: 'User not found' });
+        res.json({ success: true, user: { id: user.id, type: user.type } });
+    } catch (error) {
+        res.status(500).json({ error: 'Update failed' });
     }
-
-    users[userIndex].type = type;
-    saveUsers(users);
-
-    res.json({ success: true, user: { id: users[userIndex].id, type: users[userIndex].type } });
 });
 
-app.patch('/api/auth/users/:id/password', (req, res) => {
+app.patch('/api/auth/users/:id/password', async (req, res) => {
     const { id } = req.params;
     const { password } = req.body;
 
-    if (!password) {
-        return res.status(400).json({ error: 'Password is required' });
+    if (!password) return res.status(400).json({ error: 'Password is required' });
+
+    try {
+        const user = await User.findOneAndUpdate({ id }, { password }, { new: true });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        res.json({ success: true, message: 'Password updated successfully' });
+    } catch (error) {
+        res.status(500).json({ error: 'Update failed' });
     }
-
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.id === id);
-
-    if (userIndex === -1) {
-        return res.status(404).json({ error: 'User not found' });
-    }
-
-    users[userIndex].password = password;
-    saveUsers(users);
-
-    res.json({ success: true, message: 'Password updated successfully' });
 });
 
-app.post('/api/auth/forgot-password', (req, res) => {
+app.post('/api/auth/forgot-password', async (req, res) => {
     const { email } = req.body;
-    const users = getUsers();
-    const user = users.find(u => u.email === email);
+    try {
+        const user = await User.findOne({ email });
 
-    if (!user) {
-        // Still return success for security (prevent email enum)
-        return res.json({ success: true, message: 'If an account exists with this email, a reset link will be sent.' });
-    }
-
-    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    const expiry = Date.now() + 3600000; // 1 hour
-
-    const userIndex = users.findIndex(u => u.id === user.id);
-    users[userIndex].resetToken = token;
-    users[userIndex].resetTokenExpiry = expiry;
-    saveUsers(users);
-
-    const resetLink = `http://localhost:3000/?token=${token}`;
-    console.log(`\n--- PASSWORD RESET SIMULATION ---`);
-    console.log(`To: ${email}`);
-    console.log(`Link: ${resetLink}`);
-    console.log(`----------------------------------\n`);
-
-    res.json({ success: true, message: 'If an account exists with this email, a reset link will be sent.' });
-});
-
-app.post('/api/auth/reset-password', (req, res) => {
-    const { token, password } = req.body;
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.resetToken === token && u.resetTokenExpiry > Date.now());
-
-    if (userIndex === -1) {
-        return res.status(400).json({ error: 'Invalid or expired reset token' });
-    }
-
-    users[userIndex].password = password;
-    delete users[userIndex].resetToken;
-    delete users[userIndex].resetTokenExpiry;
-    saveUsers(users);
-
-    res.json({ success: true, message: 'Password has been reset successfully.' });
-});
-
-app.delete('/api/storage/:key', (req, res) => {
-    const key = req.params.key;
-    const filePath = path.join(DATA_DIR, `${key}.json`);
-
-    if (fs.existsSync(filePath)) {
-        try {
-            fs.unlinkSync(filePath);
-            res.json({ success: true });
-        } catch (error) {
-            res.status(500).json({ error: 'Failed to delete data' });
+        if (!user) {
+            // Security: don't reveal existence
+            return res.json({ success: true, message: 'If an account exists with this email, a reset link will be sent.' });
         }
-    } else {
-        res.status(404).json({ error: 'Key not found' });
+
+        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const expiry = Date.now() + 3600000; // 1 hour
+
+        user.resetToken = token;
+        user.resetTokenExpiry = expiry;
+        await user.save();
+
+        const resetLink = `http://localhost:3000/?token=${token}`;
+        console.log(`\n--- PASSWORD RESET SIMULATION ---`);
+        console.log(`To: ${email}`);
+        console.log(`Link: ${resetLink}`);
+        console.log(`----------------------------------\n`);
+
+        res.json({ success: true, message: 'If an account exists with this email, a reset link will be sent.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error processing request' });
     }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+    const { token, password } = req.body;
+    try {
+        const user = await User.findOne({
+            resetToken: token,
+            resetTokenExpiry: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        user.password = password;
+        user.resetToken = undefined;
+        user.resetTokenExpiry = undefined;
+        await user.save();
+
+        res.json({ success: true, message: 'Password has been reset successfully.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error processing request' });
+    }
+});
+
+app.delete('/api/storage/:key', async (req, res) => {
+    const key = req.params.key;
+    // Implementing delete on storage keys is tricky with current schema
+    // Assuming clear all data for key? NOT IMPLEMENTED SAFEGUARD
+    res.status(501).json({ error: 'Not implemented in DB mode' });
 });
 
 // --- PDF Processing Endpoint ---
@@ -306,9 +367,6 @@ app.use(express.static(path.join(__dirname, 'build')));
 app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
-
-// Use process.env.PORT for deployment platform compatibility
-const SERVER_PORT = process.env.PORT || PORT;
 
 app.listen(SERVER_PORT, () => {
     console.log(`Server running at http://localhost:${SERVER_PORT}`);

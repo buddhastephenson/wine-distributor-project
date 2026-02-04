@@ -10,7 +10,7 @@
   {
     "id": "user-1769562389315",
     "username": "customer",
-    "password": "troubleshoot",
+    "password": "customer",
     "type": "customer",
     "accessRevoked": false,
     "email": "customer@example.com"
