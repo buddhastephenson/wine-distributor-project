@@ -1151,21 +1151,54 @@ const WineDistributorApp = () => {
   };
 
   const deleteProduct = async (productId) => {
-    const updatedProducts = products.filter(p => p.id !== productId);
-    await saveProducts(updatedProducts);
-    setUploadStatus('Product deleted successfully');
-    setTimeout(() => setUploadStatus(''), 3000);
-    setDeleteConfirmation(null);
+    try {
+      // 1. Optimistic UI Update
+      const updatedProducts = products.filter(p => p.id !== productId);
+      setProducts(updatedProducts);
+      setDeleteConfirmation(null);
+
+      // 2. API Call (Granular Delete)
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Delete failed');
+
+      setUploadStatus('Product deleted successfully');
+      setTimeout(() => setUploadStatus(''), 3000);
+    } catch (error) {
+      console.error('Delete error:', error);
+      setUploadStatus('Error deleting product');
+      // Revert UI on failure (optional but good practice)
+      // loadFromStorage(); // Or specific revert logic
+    }
   };
 
   const handleUpdateProduct = async (updatedProduct) => {
     const pricing = calculateFrontlinePrice(updatedProduct);
     const finalProduct = { ...updatedProduct, ...pricing };
+
+    // 1. Optimistic UI Update
     const updatedProducts = products.map(p => p.id === finalProduct.id ? finalProduct : p);
-    await saveProducts(updatedProducts);
-    setUploadStatus(`Updated ${finalProduct.producer} - ${finalProduct.productName}`);
-    setTimeout(() => setUploadStatus(''), 3000);
+    setProducts(updatedProducts);
     setEditingProduct(null);
+
+    try {
+      // 2. API Call (Granular Update)
+      const response = await fetch(`/api/products/${finalProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalProduct)
+      });
+
+      if (!response.ok) throw new Error('Update failed');
+
+      setUploadStatus(`Updated ${finalProduct.producer} - ${finalProduct.productName}`);
+      setTimeout(() => setUploadStatus(''), 3000);
+    } catch (error) {
+      console.error('Update error:', error);
+      setUploadStatus('Error updating product');
+    }
   };
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {

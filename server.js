@@ -59,6 +59,9 @@ app.get('/api/storage/:key', async (req, res) => {
         } else if (key === 'taxonomy') {
             const taxDoc = await Taxonomy.findOne({ name: 'main_taxonomy' });
             result = taxDoc ? taxDoc.data : {};
+        } else if (['wine-discontinued', 'wine-suspended', 'wine-inventory'].includes(key)) {
+            // Return empty list for these legacy keys to prevent 404s until fully migrated
+            result = [];
         } else {
             // For other keys (e.g., wine-order-notes), return empty or handle if crucial
             // Currently returning null to signify not found/implemented
@@ -75,6 +78,43 @@ app.get('/api/storage/:key', async (req, res) => {
     }
 });
 
+// --- Granular Data Endpoints (New Architecture) ---
+
+// 1. Single Product Update (PATCH)
+app.patch('/api/products/:id', async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+
+    try {
+        const product = await Product.findOneAndUpdate({ id }, updates, { new: true });
+        if (!product) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        res.json({ success: true, product });
+    } catch (error) {
+        console.error(`Error updating product ${id}:`, error);
+        res.status(500).json({ error: 'Failed to update product' });
+    }
+});
+
+// 2. Single Product Delete (DELETE)
+app.delete('/api/products/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const result = await Product.findOneAndDelete({ id });
+        if (!result) {
+            return res.status(440).json({ error: 'Product not found' });
+        }
+        res.json({ success: true, message: 'Product deleted' });
+    } catch (error) {
+        console.error(`Error deleting product ${id}:`, error);
+        res.status(500).json({ error: 'Failed to delete product' });
+    }
+});
+
+// --- Legacy Storage Endpoints (Modified for Read Compatibility) ---
+
 app.post('/api/storage/:key', async (req, res) => {
     const key = req.params.key;
     const { value } = req.body; // value is a JSON string
@@ -83,26 +123,13 @@ app.post('/api/storage/:key', async (req, res) => {
         const data = JSON.parse(value);
 
         if (key === 'wine-products') {
-            // Full replace logic (optimizable later)
-            // Strategy: Upsert each item. 
-            // Warning: This is heavy if value is huge 8MB file. 
-            // Better to just update what changed if possible, but frontend sends WHOLE list.
-            // For now, we will process upserts in a loop.
-
-            // Note: Ideally allow frontend to patch, but for now we sync.
-            // To prevent stale data accumulation, we might need to delete ones not in list?
-            // "I want it built right" -> Deleting missing is dangerous without transaction.
-            // Let's rely on upsert for now.
-
+            // For bulk saves (e.g. imports), we still support this, but optimized
+            // Note: Frontend refactor effectively stops calling this for single edits
             for (const item of data) {
                 await Product.findOneAndUpdate({ id: item.id }, item, { upsert: true });
             }
-            // TODO: Handle deletion of products removed from frontend list?
-
         } else if (key === 'wine-special-orders') {
             // data is { "username": [orders...] }
-            // We need to sync this.
-
             for (const username of Object.keys(data)) {
                 const userOrders = data[username];
                 for (const order of userOrders) {
