@@ -3980,8 +3980,8 @@ const WineDistributorApp = () => {
                               min="0"
                               value={item.cases}
                               onChange={(e) => updateListUnits(item.id, 'cases', e.target.value)}
-                              disabled={item.submitted && currentUser.type === 'customer'}
-                              className={`w-full px-5 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-mono font-black ${item.submitted && currentUser.type === 'customer' ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'}`}
+                              disabled={currentUser.type === 'customer' && ['On Purchase Order', 'In Stock', 'Delivered'].includes(item.status)}
+                              className={`w-full px-5 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-mono font-black ${(currentUser.type === 'customer' && ['On Purchase Order', 'In Stock', 'Delivered'].includes(item.status)) ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'}`}
                               placeholder="0"
                             />
                           </div>
@@ -3992,8 +3992,8 @@ const WineDistributorApp = () => {
                               min="0"
                               value={item.bottles}
                               onChange={(e) => updateListUnits(item.id, 'bottles', e.target.value)}
-                              disabled={item.submitted && currentUser.type === 'customer'}
-                              className={`w-full px-5 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-mono font-black ${item.submitted && currentUser.type === 'customer' ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'}`}
+                              disabled={currentUser.type === 'customer' && ['On Purchase Order', 'In Stock', 'Delivered'].includes(item.status)}
+                              className={`w-full px-5 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-mono font-black ${(currentUser.type === 'customer' && ['On Purchase Order', 'In Stock', 'Delivered'].includes(item.status)) ? ' bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-800' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'}`}
                               placeholder="0"
                             />
                           </div>
@@ -4035,10 +4035,10 @@ const WineDistributorApp = () => {
                             <textarea
                               value={item.notes}
                               onChange={(e) => updateListItemMetadata(item.id, item.status, e.target.value)}
-                              disabled={false}
+                              disabled={currentUser.type === 'customer' && ['On Purchase Order', 'In Stock', 'Delivered'].includes(item.status)}
                               placeholder="Add memo for distributor..."
                               rows="2"
-                              className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-xs text-slate-500 dark:text-slate-400 disabled:opacity-50"
+                              className={`w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500 transition-all font-medium text-xs text-slate-500 dark:text-slate-400 disabled:opacity-50 ${(currentUser.type === 'customer' && ['On Purchase Order', 'In Stock', 'Delivered'].includes(item.status)) ? 'cursor-not-allowed opacity-60' : ''}`}
                             />
                           </div>
 
