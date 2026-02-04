@@ -279,6 +279,25 @@ app.patch('/api/auth/users/:id/password', async (req, res) => {
     }
 });
 
+app.delete('/api/auth/users/:id', async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const user = await User.findOne({ id });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (user.username === 'treys') {
+            return res.status(403).json({ error: 'Primary administrator "treys" cannot be deleted' });
+        }
+
+        await User.findOneAndDelete({ id });
+        res.json({ success: true, message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({ error: 'Delete failed' });
+    }
+});
+
 app.post('/api/auth/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {

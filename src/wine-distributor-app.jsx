@@ -437,6 +437,27 @@ const WineDistributorApp = () => {
     }
   };
 
+  const deleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this user? This cannot be undone.')) return;
+
+    try {
+      const response = await fetch(`/api/auth/users/${userId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (data.success) {
+        setAllUsers(prev => prev.filter(u => u.id !== userId));
+        setUploadStatus('User deleted successfully');
+        setTimeout(() => setUploadStatus(''), 3000);
+      } else {
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      alert('Server connection failed');
+    }
+  };
+
   const filteredAndSortedUsers = React.useMemo(() => {
     let users = [...allUsers];
 
@@ -2077,6 +2098,15 @@ const WineDistributorApp = () => {
                                         >
                                           Reset Password
                                         </button>
+                                        {user.accessRevoked && (
+                                          <button
+                                            onClick={() => deleteUser(user.id)}
+                                            className="px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white bg-rose-600 hover:bg-rose-700 border border-transparent transition-all duration-200 shadow-sm shadow-rose-200 dark:shadow-none"
+                                            title="Permanently Delete User"
+                                          >
+                                            Delete Entirely
+                                          </button>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -3689,6 +3719,12 @@ const WineDistributorApp = () => {
                               {product.country}{product.region ? ` / ${product.region}` : ''}
                             </p>
                           )}
+                          {product.uploadDate && (
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-tight">
+                              <span className="text-slate-200 dark:text-slate-800 mx-1.5">•</span>
+                              Updated: {new Date(product.uploadDate).toLocaleDateString()}
+                            </p>
+                          )}
                         </div>
                         {product.appellation && (
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold italic uppercase tracking-tighter mb-2">{product.appellation}</p>
@@ -3771,6 +3807,11 @@ const WineDistributorApp = () => {
                               <div>
                                 <p className="font-extrabold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors uppercase tracking-tight">{product.producer}</p>
                                 <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">{product.productName}</p>
+                                {product.uploadDate && (
+                                  <p className="text-[9px] text-slate-300 dark:text-slate-600 font-bold uppercase tracking-wide mt-1">
+                                    Updated: {new Date(product.uploadDate).toLocaleDateString()}
+                                  </p>
+                                )}
                               </div>
                             </td>
                             <td className="py-4 px-6">
