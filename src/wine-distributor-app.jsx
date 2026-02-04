@@ -1406,23 +1406,52 @@ const WineDistributorApp = () => {
       return;
     }
 
-    const reportData = products.map(product => ({
-      'Supplier': product.supplier || '',
-      'Producer': product.producer,
-      'Product': product.productName,
-      'Vintage': product.vintage || 'NV',
-      'Item Code': product.itemCode || '',
-      'Type': product.productType || 'Wine',
-      'Size': String(product.bottleSize || '').replace(/[^0-9.]/g, ''),
-      'Pack': product.packSize,
-      'FOB Case': product.fobCasePrice,
-      'Frontline Btl': product.frontlinePrice,
-      'Frontline Case': product.frontlineCase || (parseFloat(product.frontlinePrice) * parseInt(product.packSize)).toFixed(2),
-      'SRP': product.srp,
-      'Wholesale Btl': product.whlsBottle,
-      'Wholesale Case': product.whlsCase,
-      'Laid In': product.laidIn
-    }));
+    const reportData = products.map(product => {
+      // Calculate current pricing to ensure accuracy even if stored data is stale
+      const currentPricing = calculateFrontlinePrice(product);
+
+      const baseData = {
+        'Supplier': product.supplier || '',
+        'Producer': product.producer,
+        'Product': product.productName,
+        'Vintage': product.vintage || 'NV',
+        'Item Code': product.itemCode || '',
+        'Type': product.productType || 'Wine',
+        'Size': String(product.bottleSize || '').replace(/[^0-9.]/g, ''),
+        'Pack': product.packSize,
+        'Country': product.country || '',
+        'Region': product.region || '',
+        'Appellation': product.appellation || '',
+        'FOB Case': parseFloat(product.fobCasePrice || 0).toFixed(2),
+        'Frontline Btl': currentPricing.frontlinePrice,
+        'Frontline Case': currentPricing.frontlineCase,
+        'SRP': currentPricing.srp,
+        'Wholesale Btl': currentPricing.whlsBottle,
+        'Wholesale Case': currentPricing.whlsCase,
+        'Laid In': currentPricing.laidIn,
+        'Product Link': getProductLink(product)
+      };
+
+      // internal keys to exclude from export
+      const internalKeys = new Set([
+        'id', 'status', 'uploadDate', 'discontinuedDate', 'replacedBy',
+        'supplier', 'producer', 'productName', 'vintage', 'itemCode',
+        'productType', 'bottleSize', 'packSize', 'country', 'region',
+        'appellation', 'fobCasePrice', 'productLink',
+        'frontlinePrice', 'frontlineCase', 'srp', 'whlsBottle', 'whlsCase', 'laidIn', 'formulaUsed'
+      ]);
+
+      // Add any other fields present on the product object
+      Object.keys(product).forEach(key => {
+        if (!internalKeys.has(key) && !baseData.hasOwnProperty(key)) {
+          // Capitalize first letter for header
+          const header = key.charAt(0).toUpperCase() + key.slice(1);
+          baseData[header] = product[key];
+        }
+      });
+
+      return baseData;
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(reportData);
     const workbook = XLSX.utils.book_new();
