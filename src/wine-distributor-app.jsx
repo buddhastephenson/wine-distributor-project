@@ -1512,7 +1512,7 @@ const WineDistributorApp = () => {
     setPriceRange([catalogPriceBounds.min, catalogPriceBounds.max]);
   };
 
-  const suppliers = [...new Set(products.map(p => p.supplier))];
+  const suppliers = [...new Set(products.map(p => p.supplier))].sort();
 
   // Login View
   if (view === 'login' || view === 'forgot-password' || view === 'reset-password') {
