@@ -3896,55 +3896,34 @@ const WineDistributorApp = () => {
                   </div>
                 </div>
 
-                {/* Price Range Slider */}
-                <div className="md:col-span-2 lg:col-span-2 flex flex-col space-y-2 pb-1 px-1">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Price Range (Wholesale)</label>
-                    <span className="text-[10px] font-black text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-2 py-0.5 rounded-md">
-                      ${priceRange[0]} - ${priceRange[1]}
-                    </span>
-                  </div>
-                  <div className="relative h-10 flex items-center mb-1">
-                    <div className="absolute w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-rose-400 md:bg-gradient-to-r md:from-rose-400 md:to-rose-600 opacity-80"
-                        style={{
-                          marginLeft: `${((priceRange[0] - catalogPriceBounds.min) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%`,
-                          width: `${((priceRange[1] - priceRange[0]) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%`
-                        }}
-                      />
-                    </div>
+                {/* Price Range Inputs */}
+                <div className="md:col-span-2 lg:col-span-2 flex space-x-2 pb-1 px-1">
+                  <div className="flex-1">
+                    <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Min Price ($)</label>
                     <input
-                      type="range"
-                      min={catalogPriceBounds.min}
-                      max={catalogPriceBounds.max}
+                      type="number"
+                      min="0"
                       value={priceRange[0]}
                       onChange={(e) => {
-                        const val = Math.min(Number(e.target.value), priceRange[1] - 1);
+                        const val = Math.max(0, parseFloat(e.target.value) || 0);
                         setPriceRange([val, priceRange[1]]);
                       }}
-                      className="absolute w-full h-1.5 opacity-0 z-20 range-slider-thumb appearance-none bg-transparent pointer-events-none"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-bold text-sm text-slate-700 dark:text-slate-200"
+                      placeholder="Min"
                     />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Max Price ($)</label>
                     <input
-                      type="range"
-                      min={catalogPriceBounds.min}
-                      max={catalogPriceBounds.max}
+                      type="number"
+                      min="0"
                       value={priceRange[1]}
                       onChange={(e) => {
-                        const val = Math.max(Number(e.target.value), priceRange[0] + 1);
+                        const val = parseFloat(e.target.value) || 0;
                         setPriceRange([priceRange[0], val]);
                       }}
-                      className="absolute w-full h-1.5 opacity-0 z-20 range-slider-thumb appearance-none bg-transparent pointer-events-none"
-                    />
-
-                    {/* Visible Thumbs */}
-                    <div
-                      className="absolute w-5 h-5 bg-white border-2 border-rose-500 rounded-full shadow-md pointer-events-none transform -translate-x-1/2 transition-all"
-                      style={{ left: `${((priceRange[0] - catalogPriceBounds.min) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%` }}
-                    />
-                    <div
-                      className="absolute w-5 h-5 bg-white border-2 border-rose-500 rounded-full shadow-md pointer-events-none transform -translate-x-1/2 transition-all"
-                      style={{ left: `${((priceRange[1] - catalogPriceBounds.min) / (catalogPriceBounds.max - catalogPriceBounds.min || 1)) * 100}%` }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-bold text-sm text-slate-700 dark:text-slate-200"
+                      placeholder="Max"
                     />
                   </div>
                 </div>
