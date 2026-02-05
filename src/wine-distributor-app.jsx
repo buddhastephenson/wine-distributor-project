@@ -150,6 +150,13 @@ const WineDistributorApp = () => {
   const [showRevokedUsers, setShowRevokedUsers] = useState(false);
   const [resetPasswordUserId, setResetPasswordUserId] = useState(null);
   const [adminNewPassword, setAdminNewPassword] = useState('');
+
+  // Rename User Modal State
+  const [userToRename, setUserToRename] = useState(null);
+  const [newUsernameInput, setNewUsernameInput] = useState('');
+  const [renameFeedback, setRenameFeedback] = useState({ type: '', message: '' }); // type: 'error' | 'success' | 'loading'
+
+  // Search/Filter State
   const [teamSearchTerm, setTeamSearchTerm] = useState('');
   const [teamSortConfig, setTeamSortConfig] = useState({ key: 'username', direction: 'asc' });
 
@@ -434,6 +441,100 @@ const WineDistributorApp = () => {
     } catch (error) {
       console.error('Failed to update password:', error);
       alert('Server connection failed');
+    }
+  };
+
+  const openRenameModal = (userId) => {
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) return;
+    setUserToRename(user);
+    setNewUsernameInput(user.username);
+  };
+
+  const handleRenameSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setRenameFeedback({ type: 'loading', message: 'Processing rename...' });
+
+    if (!userToRename || !newUsernameInput) {
+      setRenameFeedback({ type: 'error', message: 'Error: Missing user data.' });
+      return;
+    }
+
+    const oldUsername = userToRename.username;
+    const newUsername = newUsernameInput.trim();
+
+    if (newUsername === oldUsername) {
+      setRenameFeedback({ type: 'info', message: 'No changes detected.' });
+      return;
+    }
+
+    // Validate uniqueness
+    if (allUsers.some(u => u.username.toLowerCase() === newUsername.toLowerCase() && u.id !== userToRename.id)) {
+      setRenameFeedback({ type: 'error', message: 'Username already exists. Choose another.' });
+      return;
+    }
+
+    // Confirmation
+    if (!window.confirm(`Are you sure you want to rename "${oldUsername}" to "${newUsername}"?`)) {
+      setRenameFeedback({ type: 'info', message: 'Rename cancelled.' });
+      return;
+    }
+
+    // 1. Update User Record
+    const updatedUsers = allUsers.map(u =>
+      u.id === userToRename.id ? { ...u, username: newUsername } : u
+    );
+
+    // 2. Cascade Update Active Lists
+    const updatedAllLists = { ...allCustomerLists };
+    if (updatedAllLists[oldUsername]) {
+      updatedAllLists[newUsername] = updatedAllLists[oldUsername];
+      delete updatedAllLists[oldUsername];
+    }
+
+    // 3. Cascade Update Order Archive (History)
+    const updatedOrders = orders.map(order =>
+      order.customer === oldUsername ? { ...order, customer: newUsername } : order
+    );
+
+    try {
+      // PERSISTENCE
+      const response = await fetch(`/api/auth/users/${userToRename.id}/username`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newUsername })
+      });
+
+      // Handle non-JSON responses
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        setRenameFeedback({ type: 'error', message: `Server Error (${response.status})` });
+        return;
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        setRenameFeedback({ type: 'error', message: data.error || 'Failed to update' });
+        return;
+      }
+
+      await saveSpecialOrderLists(updatedAllLists);
+      await saveOrders(updatedOrders);
+
+      // LOCAL STATE
+      setAllUsers(updatedUsers);
+      setAllCustomerLists(updatedAllLists);
+
+      setRenameFeedback({ type: 'success', message: `Renamed to "${newUsername}"!` });
+
+      setTimeout(() => {
+        setUserToRename(null);
+        setRenameFeedback({ type: '', message: '' });
+      }, 1500);
+
+    } catch (err) {
+      console.error('Rename failed:', err);
+      setRenameFeedback({ type: 'error', message: err.message });
     }
   };
 
@@ -2234,6 +2335,19 @@ const WineDistributorApp = () => {
                                           {user.type === 'admin' ? 'Revoke Admin' : 'Make Admin'}
                                         </button>
                                         <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            openRenameModal(user.id);
+                                          }}
+                                          disabled={user.username === 'treys'}
+                                          className="px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
+                                          title="Rename User"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
                                           onClick={() => toggleUserAccess(user.id, !user.accessRevoked)}
                                           disabled={user.username === 'treys'}
                                           className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-200 border ${user.accessRevoked
@@ -2970,6 +3084,67 @@ const WineDistributorApp = () => {
               </div>
             )}
 
+
+            {/* Rename User Modal */}
+            {userToRename && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setUserToRename(null)}>
+                <div
+                  className="bg-white dark:bg-slate-900 rounded-3xl p-8 w-full max-w-md shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-200"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Rename User</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                    Update username for <span className="font-bold text-slate-900 dark:text-white">{userToRename.username}</span>.
+                    <br />
+                    <span className="text-xs opacity-75">Existing data (lists, history) will be migrated.</span>
+                  </p>
+
+                  {renameFeedback.message && (
+                    <div className={`mb-4 p-3 rounded-xl text-xs font-bold ${renameFeedback.type === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                      renameFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                        'bg-slate-50 text-slate-600 border border-slate-100'
+                      }`}>
+                      {renameFeedback.message}
+                    </div>
+                  )}
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">New Username</label>
+                      <input
+                        type="text"
+                        value={newUsernameInput}
+                        onChange={(e) => setNewUsernameInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleRenameSubmit(e);
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-bold text-slate-900 dark:text-white"
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="flex space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => setUserToRename(null)}
+                        className="flex-1 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleRenameSubmit(e)}
+                        className="flex-1 py-3 rounded-xl font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200 dark:shadow-none"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Supplier Selection Modal */}
             {pendingUpload && showSupplierModal && (

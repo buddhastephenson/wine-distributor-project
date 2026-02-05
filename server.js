@@ -278,6 +278,29 @@ app.patch('/api/auth/users/:id/role', async (req, res) => {
     }
 });
 
+app.patch('/api/auth/users/:id/username', async (req, res) => {
+    const { id } = req.params;
+    const { username } = req.body;
+
+    if (!username) return res.status(400).json({ error: 'Username is required' });
+
+    try {
+        // Uniqueness check
+        const existing = await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+        if (existing) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+
+        const user = await User.findOneAndUpdate({ id }, { username }, { new: true });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        res.json({ success: true, user: { id: user.id, username: user.username } });
+    } catch (error) {
+        console.error('Update username error:', error);
+        res.status(500).json({ error: 'Update failed' });
+    }
+});
+
 app.patch('/api/auth/users/:id/password', async (req, res) => {
     const { id } = req.params;
     const { password } = req.body;
