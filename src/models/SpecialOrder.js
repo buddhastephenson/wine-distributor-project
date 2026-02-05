@@ -28,6 +28,7 @@ const SpecialOrderSchema = new mongoose.Schema({
     notes: { type: String, default: '' },
     adminNotes: { type: String, default: '' },
     submitted: { type: Boolean, default: false },
+    isArchived: { type: Boolean, default: false }, // Tracks if item has been added to historical orders,
     hasUnseenUpdate: { type: Boolean, default: false }
 }, { timestamps: true });
 

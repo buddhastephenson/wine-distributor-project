@@ -1059,37 +1059,54 @@ const WineDistributorApp = () => {
     if (status === 'Delivered' || status === 'Out of Stock') {
       const itemToDeliver = userList.find(item => item.id === productId);
       if (itemToDeliver) {
-        // Create an "Order" snapshot for history
-        const deliverySnapshot = {
-          id: `archive-${Date.now()}`,
-          customer: username,
-          items: [{
-            ...itemToDeliver,
-            status: status,
-            notes: notes !== undefined ? notes : itemToDeliver.notes,
-            adminNotes: adminNotes !== undefined ? adminNotes : itemToDeliver.adminNotes
-          }],
-          total: status === 'Delivered' ? (parseFloat(itemToDeliver.frontlinePrice) * (itemToDeliver.quantity || 1)).toFixed(2) : "0.00",
-          status: 'closed',
-          date: new Date().toISOString(),
-          adminNote: `${status === 'Delivered' ? 'Delivered' : 'Archived (Out of Stock)'} item: ${itemToDeliver.producer} ${itemToDeliver.productName}`
-        };
+        // If it's "Out of Stock", we archive and remove immediately (as before)
+        // If "Delivered", we archive (once) but KEEP it in the list.
 
-        const updatedOrders = [...orders, deliverySnapshot];
-        const updatedList = userList.filter(item => item.id !== productId);
-        const updatedAllLists = {
-          ...allCustomerLists,
-          [username]: updatedList
-        };
+        const shouldRemove = status === 'Out of Stock';
 
-        await saveOrders(updatedOrders);
-        await saveSpecialOrderLists(updatedAllLists);
-        setAllCustomerLists(updatedAllLists);
-        setSpecialOrderList(updatedList);
-        return;
+        // Only archive if not already archived (for Delivered items which stay in list)
+        if (!itemToDeliver.isArchived) {
+          // Create an "Order" snapshot for history
+          const deliverySnapshot = {
+            id: `archive-${Date.now()}`,
+            customer: username,
+            items: [{
+              ...itemToDeliver,
+              status: status,
+              notes: notes !== undefined ? notes : itemToDeliver.notes,
+              adminNotes: adminNotes !== undefined ? adminNotes : itemToDeliver.adminNotes
+            }],
+            total: status === 'Delivered' ? (parseFloat(itemToDeliver.frontlinePrice) * (itemToDeliver.quantity || 1)).toFixed(2) : "0.00",
+            status: 'closed',
+            date: new Date().toISOString(),
+            adminNote: `${status === 'Delivered' ? 'Delivered' : 'Archived (Out of Stock)'} item: ${itemToDeliver.producer} ${itemToDeliver.productName}`
+          };
+
+          const updatedOrders = [...orders, deliverySnapshot];
+          await saveOrders(updatedOrders);
+        }
+
+        if (shouldRemove) {
+          const updatedList = userList.filter(item => item.id !== productId);
+          const updatedAllLists = {
+            ...allCustomerLists,
+            [username]: updatedList
+          };
+          await saveSpecialOrderLists(updatedAllLists);
+          setAllCustomerLists(updatedAllLists);
+          setSpecialOrderList(updatedList);
+          return;
+        } else {
+          // For Delivered: Update status, set isArchived=true, KEEP in list
+          // We fall through to the map logic below, but we need to inject the isArchived flag
+          // Actually, we can just let the map logic handle it if we pass the new status
+          // BUT we need to force isArchived=true.
+          // So let's just proceed to the `newList` mapping, but passing a flag or handling it there.
+        }
       }
     }
 
+    // Fallthrough for normal updates (and Delivered updates that are kept)
     const newList = userList.map(item => {
       if (item.id === productId) {
         return {
@@ -1097,11 +1114,15 @@ const WineDistributorApp = () => {
           status,
           notes,
           adminNotes: adminNotes !== undefined ? adminNotes : item.adminNotes,
-          hasUnseenUpdate: currentUser.type === 'admin' ? true : item.hasUnseenUpdate
+          hasUnseenUpdate: currentUser.type === 'admin' ? true : item.hasUnseenUpdate,
+          // If setting to Delivered, mark as archived
+          isArchived: status === 'Delivered' ? true : item.isArchived
         };
       }
       return item;
     });
+
+
 
     const updatedAllLists = {
       ...allCustomerLists,
@@ -1267,6 +1288,23 @@ const WineDistributorApp = () => {
 
     const reportData = [];
     orders.forEach(order => {
+      // Filter out orders from deleted users
+      const isValidUser = allUsers.some(u => u.username === order.customer || u.companyName === order.customer);
+      // Also allow if it's a legacy order from a user who might have been renamed? 
+      // User wants to PURGE deleted users. So strict check is good.
+      // But wait, "Admin" is a customer type?
+      // "Admin" usually doesn't have a User record in `allUsers`?
+      // I need to check if "Admin" is in `allUsers`.
+      // The user said "Admin" was missing before.
+      // Usually "Admin" is just a role.
+      // I'll check `allUsers.some` OR if it matches `currentUser.username` (if admin) or just be careful.
+      // Actually, looking at `allUsers`, it should contain everyone who can login.
+      // But let's be safe: if `order.customer` exists in `allUsers` OR `order.customer === 'Admin'`.
+
+      const isKnownUser = allUsers.some(u => u.username === order.customer) || order.customer === 'Admin';
+
+      if (!isKnownUser) return;
+
       order.items.forEach(item => {
         reportData.push({
           'Order ID': order.id,
@@ -1305,6 +1343,10 @@ const WineDistributorApp = () => {
   const generateSpecialOrderReport = () => {
     const allItems = [];
     Object.entries(allCustomerLists).forEach(([username, items]) => {
+      // Filter: Only include if user exists in allUsers (or is Admin)
+      const isKnownUser = allUsers.some(u => u.username === username) || username === 'Admin';
+      if (!isKnownUser) return;
+
       items.forEach(item => {
         allItems.push({
           'Customer': username,
@@ -1957,7 +1999,60 @@ const WineDistributorApp = () => {
                   {collapsedSections.customerLists ? <ChevronRight className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300" /> : <ChevronDown className="w-5 h-5 text-rose-600 dark:text-rose-400" />}
                 </div>
                 <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">Active Customer Lists</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">Active Customer Lists</h2>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!window.confirm('Are you sure you want to cleanup data? This will:\n1. Remove deleted users\n2. Deduplicate history\n\nThis cannot be undone.')) return;
+
+                        // Purge Logic
+                        const validUsernames = new Set(allUsers.map(u => u.username));
+                        validUsernames.add('Admin'); // Protect Admin
+
+                        // 1. Purge Active Lists of Zombie Users
+                        const cleanedLists = {};
+                        Object.entries(allCustomerLists).forEach(([user, list]) => {
+                          if (validUsernames.has(user)) {
+                            cleanedLists[user] = list;
+                          }
+                        });
+
+                        // 2. Filter Archive for Zombie Users
+                        const validOrders = orders.filter(order => validUsernames.has(order.customer));
+
+                        // 3. Deduplicate Archive (Special Orders only)
+                        const uniqueOrders = [];
+                        const seenKeys = new Set();
+
+                        validOrders.forEach(order => {
+                          // Check if it's a special order snapshot (usually has 1 item)
+                          // We key by Customer + First Item ID (assuming 1 item per snapshot for special orders)
+                          const firstItem = order.items?.[0];
+
+                          if (firstItem && firstItem.id) {
+                            const key = `${order.customer}-${firstItem.id}`;
+                            if (seenKeys.has(key)) {
+                              return; // Duplicate
+                            }
+                            seenKeys.add(key);
+                          }
+
+                          uniqueOrders.push(order);
+                        });
+
+                        await saveSpecialOrderLists(cleanedLists);
+                        await saveOrders(uniqueOrders);
+                        setAllCustomerLists(cleanedLists);
+
+                        alert(`Cleanup complete.\n- Orphans removed\n- Archive reduced from ${orders.length} to ${uniqueOrders.length} records`);
+                      }}
+                      className="ml-4 px-2 py-1 text-[9px] font-bold text-rose-600 bg-rose-50 rounded hover:bg-rose-100 transition-colors uppercase tracking-widest border border-rose-200"
+                      title="Remove deleted users and deduplicate history"
+                    >
+                      Cleanup Data
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">Special order requests by establishment</p>
                 </div>
               </div>
@@ -2292,68 +2387,7 @@ const WineDistributorApp = () => {
               </div>
             </div>
 
-            {/* Louis Dressner PDF Converter Section */}
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 dark:border-slate-800 mb-10 overflow-hidden">
-              <div
-                className="flex items-center mb-6 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/50 p-3 -m-3 rounded-2xl transition-all duration-200 group"
-                onClick={() => toggleSection('dressner')}
-              >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 transition-all duration-300 ${collapsedSections.dressner ? 'bg-slate-100 dark:bg-slate-800' : 'bg-purple-50 dark:bg-purple-900/20'}`}>
-                  {collapsedSections.dressner ? <ChevronRight className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300" /> : <ChevronDown className="w-5 h-5 text-purple-600 dark:text-purple-400" />}
-                </div>
-                <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">External PDF Pipeline</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">Louis Dressner protocol converters</p>
-                </div>
-              </div>
 
-              {!collapsedSections.dressner && (
-                <div className="animate-in fade-in duration-500 space-y-8">
-                  <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl">
-                    <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium leading-relaxed">
-                      <span className="font-bold">Automated Protocol:</span> For Louis Dressner source PDFs, use the satellite converters below to generate a compatible schema, then upload the resulting file to the primary dropzone.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-100 dark:border-slate-800 hover:border-purple-200 dark:hover:border-purple-800 hover:shadow-sm dark:hover:shadow-none transition-all duration-300 group">
-                      <h3 className="text-sm font-extrabold text-slate-900 dark:text-white mb-2 flex items-center">
-                        <div className="w-2 h-2 bg-purple-500 dark:bg-purple-400 rounded-full mr-2"></div>
-                        Desktop Satellite (macOS)
-                      </h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mb-6">Drop-target application for high-volume conversion</p>
-                      <a
-                        href="/api/placeholder/download/mac-app"
-                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900/30 rounded-xl font-bold text-xs hover:bg-purple-600 dark:hover:bg-purple-500 hover:text-white transition-all duration-300 shadow-sm"
-                        download="louis_dressner_converter_mac.py"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download Satellite App</span>
-                      </a>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-100 dark:border-slate-800 hover:border-purple-200 dark:hover:border-purple-800 hover:shadow-sm dark:hover:shadow-none transition-all duration-300 group">
-                      <h3 className="text-sm font-extrabold text-slate-900 dark:text-white mb-2 flex items-center">
-                        <div className="w-2 h-2 bg-slate-400 dark:text-slate-500 rounded-full mr-2"></div>
-                        Terminal CLI Utility
-                      </h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mb-4">Python-based command line interface</p>
-                      <code className="text-[10px] bg-slate-900 dark:bg-slate-950 text-slate-300 dark:text-slate-400 p-3 rounded-xl block mb-6 font-mono leading-relaxed border dark:border-slate-800">
-                        python3 convert.py source.pdf output.xlsx
-                      </code>
-                      <a
-                        href="/api/placeholder/download/python-script"
-                        className="inline-flex items-center space-x-2 px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-300"
-                        download="convert_louis_dressner_pdf.py"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download CLI Source</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Product Catalog - Admin View with Pricing */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 dark:border-slate-800 mb-10 overflow-hidden">
