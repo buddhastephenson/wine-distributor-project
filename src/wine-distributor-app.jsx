@@ -9,15 +9,17 @@ const WineDistributorApp = () => {
     return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
+  /*
+    useEffect(() => {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+    }, [isDarkMode]);
+  */
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
@@ -101,7 +103,71 @@ const WineDistributorApp = () => {
     fobCasePrice: ''
   });
 
+  const calculateFrontlinePrice = React.useCallback((product) => {
+    if (!product) return {};
+    const productType = (product.productType || 'wine').toLowerCase();
+    const productName = (product.productName || '').toLowerCase();
+
+    // Safety check just in case formulas state was corrupted
+    if (!formulas || !formulas.wine) return {};
+
+    let formula = formulas.wine;
+
+    // Helper to check keywords in either field
+    const isType = (keywords) => keywords.some(k => productType.includes(k) || productName.includes(k));
+
+    if (isType(['spirit', 'liquor', 'vodka', 'whiskey', 'whisky', 'bourbon', 'rum', 'gin', 'tequila', 'mezcal', 'brandy', 'cognac', 'amaro', 'vermouth'])) {
+      formula = formulas.spirits;
+    } else if (isType(['non-alc', 'na ', 'juice', 'soda', 'non alc', 'water', 'tea', 'coffee'])) {
+      formula = formulas.nonAlcoholic;
+    }
+
+    // Parse bottle size (remove 'ml' and convert to number)
+    const bottleSize = parseFloat(String(product.bottleSize).replace(/[^0-9.]/g, '')) || 750;
+    const packSize = parseInt(product.packSize) || 12;
+
+    // AOC Converter Formula (matching the spreadsheet exactly):
+
+    // 1. Net FOB = FOB - DA (discount amount, assume 0 for now)
+    const netFOB = product.fobCasePrice;
+
+    // 2. Case Size (L) = (bottles/case * bottle size ml) / 1000
+    const caseSizeL = (packSize * bottleSize) / 1000;
+
+    // 3. Tax = (Case Size L * taxPerLiter) + taxFixed
+    const tax = (caseSizeL * formula.taxPerLiter) + formula.taxFixed;
+
+    // 4. Taxes, etc = Shipping + Tax
+    const taxesEtc = formula.shippingPerCase + tax;
+
+    // 5. Laid In = Net FOB + Taxes, etc
+    const laidIn = netFOB + taxesEtc;
+
+    // 6. Whls Case = Laid In / 0.65
+    const whlsCase = laidIn / formula.marginDivisor;
+
+    // 7. Whls Bottle = Whls Case / bottles per case
+    const whlsBottle = whlsCase / packSize;
+
+    // 8. SRP = ROUNDUP(Whls Bottle * 1.47, 0) - 0.01
+    const srp = Math.ceil(whlsBottle * formula.srpMultiplier) - 0.01;
+
+    // 9. Frontline Bottle = SRP / 1.47
+    const frontlinePrice = srp / formula.srpMultiplier;
+
+    return {
+      frontlinePrice: frontlinePrice.toFixed(2),
+      frontlineCase: (frontlinePrice * packSize).toFixed(2),
+      srp: srp.toFixed(2),
+      whlsBottle: whlsBottle.toFixed(2),
+      whlsCase: whlsCase.toFixed(2),
+      laidIn: laidIn.toFixed(2),
+      formulaUsed: productType.includes('spirit') ? 'spirits' : productType.includes('non-alc') || productType.includes('non alc') ? 'nonAlcoholic' : 'wine'
+    };
+  }, [formulas]);
+
   // Initialize price bounds based on active products
+  /*
   useEffect(() => {
     if (products.length > 0) {
       const prices = products.map(p => parseFloat(calculateFrontlinePrice(p).whlsBottle) || 0);
@@ -109,15 +175,21 @@ const WineDistributorApp = () => {
       const max = Math.ceil(Math.max(...prices));
 
       const prevBounds = catalogPriceBounds;
-      setCatalogPriceBounds({ min, max });
 
-      // Auto-expand selection if it was already at the default/previous bounds
-      if ((priceRange[0] === 0 && priceRange[1] === 1000) ||
-        (priceRange[0] === prevBounds.min && priceRange[1] === prevBounds.max)) {
-        setPriceRange([min, max]);
+      // Only update if bounds actually changed to prevent loops
+      if (prevBounds.min !== min || prevBounds.max !== max) {
+        setCatalogPriceBounds({ min, max });
+
+        // Auto-expand selection if it was already at the default/previous bounds
+        if ((priceRange[0] === 0 && priceRange[1] === 1000) ||
+          (priceRange[0] === prevBounds.min && priceRange[1] === prevBounds.max)) {
+          setPriceRange([min, max]);
+        }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
+  */
 
   // Initialize manual mode based on product data validity against taxonomy
   useEffect(() => {
@@ -185,22 +257,28 @@ const WineDistributorApp = () => {
     try {
       const productsResult = await window.storage.get('wine-products');
       if (productsResult) {
-        setProducts(JSON.parse(productsResult.value));
+        const parsed = JSON.parse(productsResult.value);
+        setProducts(Array.isArray(parsed) ? parsed : []);
       }
 
       const ordersResult = await window.storage.get('wine-orders');
       if (ordersResult) {
-        setOrders(JSON.parse(ordersResult.value));
+        const parsed = JSON.parse(ordersResult.value);
+        setOrders(Array.isArray(parsed) ? parsed : []);
       }
 
       const discontinuedResult = await window.storage.get('wine-discontinued');
       if (discontinuedResult) {
-        setDiscontinuedProducts(JSON.parse(discontinuedResult.value));
+        const parsed = JSON.parse(discontinuedResult.value);
+        setDiscontinuedProducts(Array.isArray(parsed) ? parsed : []);
       }
 
       const formulasResult = await window.storage.get('wine-formulas');
       if (formulasResult) {
-        setFormulas(JSON.parse(formulasResult.value));
+        const parsed = JSON.parse(formulasResult.value);
+        if (parsed && parsed.wine) {
+          setFormulas(parsed);
+        }
       }
 
       const mappingTemplatesResult = await window.storage.get('wine-mapping-templates');
@@ -211,7 +289,7 @@ const WineDistributorApp = () => {
       const specialOrdersResult = await window.storage.get('wine-special-orders');
       if (specialOrdersResult) {
         const lists = JSON.parse(specialOrdersResult.value);
-        setAllCustomerLists(lists);
+        setAllCustomerLists(lists || {});
       }
 
       const orderNotesResult = await window.storage.get('wine-order-notes');
@@ -225,7 +303,7 @@ const WineDistributorApp = () => {
         if (taxonomyResponse.ok) {
           const taxonomyData = await taxonomyResponse.json();
           if (taxonomyData && taxonomyData.value) {
-            setTaxonomy(JSON.parse(taxonomyData.value));
+            setTaxonomy(JSON.parse(taxonomyData.value) || {});
           }
         }
       } catch (e) {
@@ -639,63 +717,7 @@ const WineDistributorApp = () => {
 
 
 
-  const calculateFrontlinePrice = (product) => {
-    const productType = (product.productType || 'wine').toLowerCase();
-    const productName = (product.productName || '').toLowerCase();
-    let formula = formulas.wine;
 
-    // Helper to check keywords in either field
-    const isType = (keywords) => keywords.some(k => productType.includes(k) || productName.includes(k));
-
-    if (isType(['spirit', 'liquor', 'vodka', 'whiskey', 'whisky', 'bourbon', 'rum', 'gin', 'tequila', 'mezcal', 'brandy', 'cognac', 'amaro', 'vermouth'])) {
-      formula = formulas.spirits;
-    } else if (isType(['non-alc', 'na ', 'juice', 'soda', 'non alc', 'water', 'tea', 'coffee'])) {
-      formula = formulas.nonAlcoholic;
-    }
-
-    // Parse bottle size (remove 'ml' and convert to number)
-    const bottleSize = parseFloat(String(product.bottleSize).replace(/[^0-9.]/g, '')) || 750;
-    const packSize = parseInt(product.packSize) || 12;
-
-    // AOC Converter Formula (matching the spreadsheet exactly):
-
-    // 1. Net FOB = FOB - DA (discount amount, assume 0 for now)
-    const netFOB = product.fobCasePrice;
-
-    // 2. Case Size (L) = (bottles/case * bottle size ml) / 1000
-    const caseSizeL = (packSize * bottleSize) / 1000;
-
-    // 3. Tax = (Case Size L * taxPerLiter) + taxFixed
-    const tax = (caseSizeL * formula.taxPerLiter) + formula.taxFixed;
-
-    // 4. Taxes, etc = Shipping + Tax
-    const taxesEtc = formula.shippingPerCase + tax;
-
-    // 5. Laid In = Net FOB + Taxes, etc
-    const laidIn = netFOB + taxesEtc;
-
-    // 6. Whls Case = Laid In / 0.65
-    const whlsCase = laidIn / formula.marginDivisor;
-
-    // 7. Whls Bottle = Whls Case / bottles per case
-    const whlsBottle = whlsCase / packSize;
-
-    // 8. SRP = ROUNDUP(Whls Bottle * 1.47, 0) - 0.01
-    const srp = Math.ceil(whlsBottle * formula.srpMultiplier) - 0.01;
-
-    // 9. Frontline Bottle = SRP / 1.47
-    const frontlinePrice = srp / formula.srpMultiplier;
-
-    return {
-      frontlinePrice: frontlinePrice.toFixed(2),
-      frontlineCase: (frontlinePrice * packSize).toFixed(2),
-      srp: srp.toFixed(2),
-      whlsBottle: whlsBottle.toFixed(2),
-      whlsCase: whlsCase.toFixed(2),
-      laidIn: laidIn.toFixed(2),
-      formulaUsed: productType.includes('spirit') ? 'spirits' : productType.includes('non-alc') || productType.includes('non alc') ? 'nonAlcoholic' : 'wine'
-    };
-  };
 
   const handleQuickCreateProduct = async () => {
     // Validation
@@ -1471,9 +1493,6 @@ const WineDistributorApp = () => {
           'Cases': item.cases || 0,
           'Bottles': item.bottles || 0,
           'Total Bottles': item.quantity,
-          'Status': item.status || 'Requested',
-          'Admin Comments': item.adminNotes || '',
-          'Notes': item.notes || '',
           'Status': item.status || 'Requested',
           'Admin Comments': item.adminNotes || '',
           'Notes': item.notes || '',

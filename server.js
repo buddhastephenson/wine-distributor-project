@@ -14,6 +14,7 @@ const User = require('./src/models/User');
 const Product = require('./src/models/Product');
 const SpecialOrder = require('./src/models/SpecialOrder');
 const Taxonomy = require('./src/models/Taxonomy');
+const Storage = require('./src/models/Storage');
 
 const app = express();
 // Use process.env.PORT for deployment platform compatibility
@@ -64,13 +65,14 @@ app.get('/api/storage/:key', async (req, res) => {
             result = [];
         } else {
             // For other keys (e.g., wine-order-notes), return empty or handle if crucial
-            // Currently returning null to signify not found/implemented
-            // Returning 404 might break frontend if it expects something, checking frontend logic it warns but continues.
-            return res.status(404).json({ error: 'Key not handled in DB migration' });
+            // Fallback to Generic Storage
+            const doc = await Storage.findOne({ key });
+            result = doc ? JSON.parse(doc.value) : null;
         }
 
         // Maintain legacy contract: { value: stringified_json }
-        res.json({ value: JSON.stringify(result) });
+        // If result is null (not found), returning null value is appropriate
+        res.json({ value: result ? JSON.stringify(result) : null });
 
     } catch (error) {
         console.error(`Error reading key ${key}:`, error);
@@ -157,6 +159,13 @@ app.post('/api/storage/:key', async (req, res) => {
             }
         } else if (key === 'taxonomy') {
             await Taxonomy.findOneAndUpdate({ name: 'main_taxonomy' }, { data }, { upsert: true });
+        } else {
+            // Fallback: Save to Generic Storage
+            await Storage.findOneAndUpdate(
+                { key },
+                { value }, // value is already the stringified JSON
+                { upsert: true }
+            );
         }
 
         res.json({ success: true });

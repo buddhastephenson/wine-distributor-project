@@ -23,17 +23,30 @@ window.storage = {
     set: async (key, value) => {
         // Try to save to backend
         try {
-            await fetch(`${API_URL}/${key}`, {
+            const response = await fetch(`${API_URL}/${key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ value })
             });
+
+            if (response.ok) {
+                // If backend save succeeded, we don't need to save to localStorage
+                // This prevents "QuotaExceededError" when the payload is large
+                return;
+            } else {
+                console.warn(`Backend save returned ${response.status} for ${key}`);
+            }
         } catch (error) {
             console.warn(`Backend save failed for ${key}, using localStorage only`);
         }
 
-        // Always set in localStorage as well for redundancy
-        localStorage.setItem(key, value);
+        // Fallback: If backend failed, save to localStorage as a backup
+        try {
+            localStorage.setItem(key, value);
+        } catch (e) {
+            console.error('LocalStorage failed (Quota Exceeded?):', e);
+            alert('Warning: Local storage is full and backend is unreachable. Changes may simply not be saved.');
+        }
     },
     delete: async (key) => {
         try {
