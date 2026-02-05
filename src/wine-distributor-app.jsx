@@ -283,7 +283,7 @@ const WineDistributorApp = () => {
 
       const mappingTemplatesResult = await window.storage.get('wine-mapping-templates');
       if (mappingTemplatesResult) {
-        setMappingTemplates(JSON.parse(mappingTemplatesResult.value));
+        setMappingTemplates(JSON.parse(mappingTemplatesResult.value) || {});
       }
 
       const specialOrdersResult = await window.storage.get('wine-special-orders');
@@ -815,14 +815,19 @@ const WineDistributorApp = () => {
           if (result.success) {
             const jsonData = result.data;
 
-            // Get headers from first row
-            const headers = jsonData[0].map(h => String(h || '').trim());
+            if (!jsonData || jsonData.length === 0 || !jsonData[0]) {
+              throw new Error('No data found in file');
+            }
+
+            // Get headers (ensure dense array to avoid sparse array issues in findIndex)
+            const headerRow = jsonData[0] || [];
+            const headers = Array.from({ length: headerRow.length }, (_, i) => String(headerRow[i] || '').trim());
 
             // Extract clean supplier name from filename
             const cleanSupplierName = extractSupplierName(file.name);
 
             // Check if we have a saved template for this supplier
-            const savedTemplate = mappingTemplates[cleanSupplierName];
+            const savedTemplate = (mappingTemplates || {})[cleanSupplierName];
 
             let autoMapping;
             if (savedTemplate) {
@@ -877,61 +882,77 @@ const WineDistributorApp = () => {
         // Handle Excel file (existing code)
         const reader = new FileReader();
         reader.onload = async (e) => {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
 
-          // Get headers
-          const headers = jsonData[0].map(h => String(h || '').trim());
+            if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+              throw new Error('Excel file appears to be empty (no sheets found)');
+            }
 
-          // Extract clean supplier name from filename
-          const cleanSupplierName = extractSupplierName(file.name);
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-          // Check if we have a saved template for this supplier
-          const savedTemplate = mappingTemplates[cleanSupplierName];
+            if (!jsonData || jsonData.length === 0 || !jsonData[0]) {
+              throw new Error('No data found in file or empty sheet');
+            }
 
-          let autoMapping;
-          if (savedTemplate) {
-            // Use saved template
-            autoMapping = savedTemplate;
-            setUploadStatus(`Found saved mapping template for ${cleanSupplierName}`);
-          } else {
-            // Auto-detect columns
-            autoMapping = {
-              itemCode: findColumnIndex(headers, ['item code', 'sku', 'code', 'item', 'item#']),
-              producer: findColumnIndex(headers, ['producer', 'winery', 'brand', 'manufacturer', 'supplier']),
-              productName: findColumnIndex(headers, ['product', 'name', 'wine', 'description', 'item']),
-              vintage: findColumnIndex(headers, ['vintage', 'year']),
-              packSize: findColumnIndex(headers, ['pack', 'pack size', 'case size', 'cs', 'btl/cs']),
-              bottleSize: findColumnIndex(headers, ['bottle', 'bottle size', 'size', 'ml', 'volume']),
-              productType: findColumnIndex(headers, ['type', 'category', 'product type', 'class']),
-              fobCasePrice: findColumnIndex(headers, ['fob', 'price', 'case price', 'cost', 'wholesale']),
-              productLink: findColumnIndex(headers, ['link', 'url', 'website', 'info']),
-              country: findColumnIndex(headers, ['country', 'nation', 'pays']),
-              region: findColumnIndex(headers, ['region', 'area', 'district']),
-              appellation: findColumnIndex(headers, ['appellation', 'ava', 'doc', 'docg', 'aoc'])
-            };
+            // Get headers (ensure dense array to avoid sparse array issues in findIndex)
+            const headerRow = jsonData[0] || [];
+            const headers = Array.from({ length: headerRow.length }, (_, i) => String(headerRow[i] || '').trim());
+
+            // Extract clean supplier name from filename
+            const cleanSupplierName = extractSupplierName(file.name);
+
+            // Check if we have a saved template for this supplier
+            const savedTemplate = (mappingTemplates || {})[cleanSupplierName];
+
+            let autoMapping;
+            if (savedTemplate) {
+              // Use saved template
+              autoMapping = savedTemplate;
+              setUploadStatus(`Found saved mapping template for ${cleanSupplierName}`);
+            } else {
+              // Auto-detect columns
+              autoMapping = {
+                itemCode: findColumnIndex(headers, ['item code', 'sku', 'code', 'item', 'item#']),
+                producer: findColumnIndex(headers, ['producer', 'winery', 'brand', 'manufacturer', 'supplier']),
+                productName: findColumnIndex(headers, ['product', 'name', 'wine', 'description', 'item']),
+                vintage: findColumnIndex(headers, ['vintage', 'year']),
+                packSize: findColumnIndex(headers, ['pack', 'pack size', 'case size', 'cs', 'btl/cs']),
+                bottleSize: findColumnIndex(headers, ['bottle', 'bottle size', 'size', 'ml', 'volume']),
+                productType: findColumnIndex(headers, ['type', 'category', 'product type', 'class']),
+                fobCasePrice: findColumnIndex(headers, ['fob', 'price', 'case price', 'cost', 'wholesale']),
+                productLink: findColumnIndex(headers, ['link', 'url', 'website', 'info']),
+                country: findColumnIndex(headers, ['country', 'nation', 'pays']),
+                region: findColumnIndex(headers, ['region', 'area', 'district']),
+                appellation: findColumnIndex(headers, ['appellation', 'ava', 'doc', 'docg', 'aoc'])
+              };
+            }
+
+            const mappedIndices = new Set(Object.values(autoMapping));
+            const unmapped = headers
+              .map((h, i) => ({ name: h, index: i }))
+              .filter(h => h.name && h.name.trim() && !mappedIndices.has(h.index));
+
+            setPendingUpload({
+              file,
+              headers,
+              data: jsonData,
+              autoMapping,
+              supplierName: cleanSupplierName,
+              hasTemplate: !!savedTemplate,
+              unmappedHeaders: unmapped
+            });
+
+            setColumnMapping(autoMapping);
+            setShowSupplierModal(true);
+            setTimeout(() => setUploadStatus(''), 2000);
+          } catch (error) {
+            console.error('Upload error inside reader:', error);
+            setUploadStatus(`Error processing Excel file: ${error.message}`);
+            setTimeout(() => setUploadStatus(''), 5000);
           }
-
-          const mappedIndices = new Set(Object.values(autoMapping));
-          const unmapped = headers
-            .map((h, i) => ({ name: h, index: i }))
-            .filter(h => h.name && h.name.trim() && !mappedIndices.has(h.index));
-
-          setPendingUpload({
-            file,
-            headers,
-            data: jsonData,
-            autoMapping,
-            supplierName: cleanSupplierName,
-            hasTemplate: !!savedTemplate,
-            unmappedHeaders: unmapped
-          });
-
-          setColumnMapping(autoMapping);
-          setShowSupplierModal(true);
-          setTimeout(() => setUploadStatus(''), 2000);
         };
         reader.readAsArrayBuffer(file);
       }
@@ -946,7 +967,7 @@ const WineDistributorApp = () => {
 
   const findColumnIndex = (headers, possibleNames) => {
     for (const name of possibleNames) {
-      const index = headers.findIndex(h => h.toLowerCase().includes(name));
+      const index = headers.findIndex(h => h && String(h).toLowerCase().includes(name));
       if (index !== -1) return index;
     }
     return -1;
