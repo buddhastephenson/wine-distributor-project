@@ -174,6 +174,13 @@ const WineDistributorApp = () => {
     }
   }, []);
 
+  // UseEffect to refresh users when entering Admin view
+  useEffect(() => {
+    if (view === 'admin') {
+      fetchAllUsers();
+    }
+  }, [view]);
+
   const loadFromStorage = async () => {
     try {
       const productsResult = await window.storage.get('wine-products');
@@ -2222,7 +2229,19 @@ const WineDistributorApp = () => {
                     {collapsedSections.team ? <ChevronRight className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300" /> : <ChevronDown className="w-5 h-5 text-rose-600 dark:text-rose-400" />}
                   </div>
                   <div>
-                    <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">Team & Security</h2>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">Team & Security</h2>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          fetchAllUsers();
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Refresh List"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-rotate-cw"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 12" /><path d="M21 3v9h-9" /></svg>
+                      </button>
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5 group-hover:text-slate-700 dark:group-hover:text-slate-200 transition-colors">Manage administrative access and permissions</p>
                   </div>
                 </div>

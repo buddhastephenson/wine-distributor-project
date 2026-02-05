@@ -172,12 +172,18 @@ app.post('/api/auth/signup', async (req, res) => {
     const { username, password, email } = req.body;
 
     try {
+        // Case-insensitive check for existing user
         const existingUser = await User.findOne({
-            $or: [{ username }, { email }]
+            $or: [
+                { username: { $regex: new RegExp(`^${username}$`, 'i') } },
+                { email: { $regex: new RegExp(`^${email}$`, 'i') } }
+            ]
         });
 
         if (existingUser) {
-            if (existingUser.email === email && existingUser.accessRevoked) {
+            console.log(`Signup Failed: Conflict with existing user: ${existingUser.username} (${existingUser.email})`);
+
+            if (existingUser.email.toLowerCase() === email.toLowerCase() && existingUser.accessRevoked) {
                 return res.status(403).json({ error: 'This email is associated with a revoked account.' });
             }
             return res.status(400).json({ error: 'User or Email already exists' });
@@ -191,12 +197,21 @@ app.post('/api/auth/signup', async (req, res) => {
             email
         });
 
+        console.log(`\n--- WELCOME EMAIL SIMULATION ---`);
+        console.log(`To: ${email}`);
+        console.log(`Subject: Welcome to AOC Special Orders!`);
+        console.log(`Content: Hello ${username}, your account has been created.`);
+        console.log(`----------------------------------\n`);
+
         res.json({
             success: true,
             user: { id: newUser.id, username, type: newUser.type, email }
         });
     } catch (error) {
         console.error('Signup Error:', error);
+        if (error.code === 11000) {
+            return res.status(400).json({ error: 'User or Email already exists (Duplicate Key)' });
+        }
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -205,8 +220,15 @@ app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
 
     try {
-        const user = await User.findOne({ username, password });
+        // Case-insensitive lookup (using regex for exact match but standardizing casing would be better in schema)
+        // For now, regex is simplest fix without schema migration
+        const user = await User.findOne({
+            username: { $regex: new RegExp(`^${username}$`, 'i') },
+            password
+        });
+
         if (!user) {
+            console.log(`Login Failed: Invalid credentials for user "${username}"`);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
