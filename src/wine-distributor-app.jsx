@@ -90,7 +90,8 @@ const WineDistributorApp = () => {
   const [taxonomy, setTaxonomy] = useState({});
   const [useManualLocation, setUseManualLocation] = useState(false);
   const [priceRange, setPriceRange] = useState([0, 1000]); // [min, max]
-  /* const [catalogPriceBounds, setCatalogPriceBounds] = useState({ min: 0, max: 1000 }); */
+  // eslint-disable-next-line no-unused-vars
+  const [catalogPriceBounds, setCatalogPriceBounds] = useState({ min: 0, max: 1000 });
   const [orderNotes, setOrderNotes] = useState({}); // { username: "note content" }
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [newProductData, setNewProductData] = useState({
@@ -212,7 +213,8 @@ const WineDistributorApp = () => {
   const [authMode, setAuthMode] = useState('login');
   const [authUsername, setAuthUsername] = useState('');
   const [authPassword, setAuthPassword] = useState('');
-  /* const [authUserType, setAuthUserType] = useState('customer'); */
+  // eslint-disable-next-line no-unused-vars
+  const [authUserType, setAuthUserType] = useState('customer');
   const [authEmail, setAuthEmail] = useState('');
   const [authError, setAuthError] = useState('');
   const [resetToken, setResetToken] = useState('');
