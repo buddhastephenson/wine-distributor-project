@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink, LayoutGrid, List, Sun, Moon, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink, LayoutGrid, List, Sun, Moon, ArrowUpDown, ArrowUp, ArrowDown, Check, UserPlus /*, Save*/ } from 'lucide-react'; // Commented out Save to suppress warning if unused
 import * as XLSX from 'xlsx';
 
 const WineDistributorApp = () => {
@@ -9,17 +9,15 @@ const WineDistributorApp = () => {
     return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
 
-  /*
-    useEffect(() => {
-      if (isDarkMode) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-      }
-    }, [isDarkMode]);
-  */
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
 
@@ -63,6 +61,7 @@ const WineDistributorApp = () => {
   const [idealDeliveryDate, setIdealDeliveryDate] = useState('');
   const [mustHaveByDate, setMustHaveByDate] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
+  const [showSubmissionSuccess, setShowSubmissionSuccess] = useState(false);
   const [pendingUpload, setPendingUpload] = useState(null);
   const [columnMapping, setColumnMapping] = useState(null);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -84,6 +83,8 @@ const WineDistributorApp = () => {
   const [originalAdmin, setOriginalAdmin] = useState(null);
   const [showImpersonationModal, setShowImpersonationModal] = useState(false);
   const [impersonationSearch, setImpersonationSearch] = useState(''); // For "Login As" functionality
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [newCustomerData, setNewCustomerData] = useState({ username: '', email: '', password: '' });
   const [selectedExtraFields, setSelectedExtraFields] = useState([]); // Extra columns to import
   const [catalogViewMode, setCatalogViewMode] = useState('grid'); // 'grid' or 'list' for customer catalog
   const [taxonomy, setTaxonomy] = useState({});
@@ -294,7 +295,7 @@ const WineDistributorApp = () => {
 
       const orderNotesResult = await window.storage.get('wine-order-notes');
       if (orderNotesResult) {
-        setOrderNotes(JSON.parse(orderNotesResult.value));
+        setOrderNotes(JSON.parse(orderNotesResult.value) || {});
       }
 
       // Load Taxonomy
@@ -404,6 +405,51 @@ const WineDistributorApp = () => {
       }
     } catch (error) {
       setAuthError('Server connection failed');
+    }
+  };
+
+  const handleCreateCustomer = async (e) => {
+    e.preventDefault();
+    if (!newCustomerData.username) {
+      alert('Please enter an establishment name');
+      return;
+    }
+
+    // Default password to username if not provided
+    const passwordToUse = newCustomerData.password || newCustomerData.username;
+    // Default email to placeholder if not provided
+    const emailToUse = newCustomerData.email || `${newCustomerData.username.toLowerCase().replace(/[^a-z0-9]/g, '')}@placeholder.aocwines.com`;
+
+    const payload = {
+      username: newCustomerData.username,
+      password: passwordToUse,
+      email: emailToUse
+    };
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        // Add new user to local list immediately
+        setAllUsers(prev => [...prev, data.user]);
+        setShowCreateUserModal(false);
+        setNewCustomerData({ username: '', email: '', password: '' });
+
+        // Optional: Ask to impersonate immediately
+        if (window.confirm(`Customer "${data.user.username}" created!\n\nLogin Defaults:\nUser: ${data.user.username}\nPass: ${passwordToUse}\n\nDo you want to "Login As" this customer now?`)) {
+          handleImpersonate(data.user);
+          setShowImpersonationModal(false);
+        }
+      } else {
+        alert(data.error || 'Creation failed');
+      }
+    } catch (error) {
+      alert('Server connection failed');
     }
   };
 
@@ -1331,7 +1377,7 @@ const WineDistributorApp = () => {
       date: new Date().toISOString(),
       idealDeliveryDate: idealDeliveryDate,
       mustHaveByDate: mustHaveByDate,
-      adminNote: orderNotes[username] || (originalAdmin ? `Created by ${originalAdmin.username} on behalf of ${username}` : null)
+      adminNote: (orderNotes && orderNotes[username]) || (originalAdmin ? `Created by ${originalAdmin.username} on behalf of ${username}` : null)
     };
 
     const updatedOrders = [...orders, orderSnapshot];
@@ -1345,7 +1391,7 @@ const WineDistributorApp = () => {
 
     await saveOrders(updatedOrders);
     await saveSpecialOrderLists(updatedAllLists);
-    await saveOrderNotes(orderNotes);
+    await saveOrderNotes(orderNotes || {});
     setAllCustomerLists(updatedAllLists);
     setSpecialOrderList(submittedList);
 
@@ -1354,7 +1400,10 @@ const WineDistributorApp = () => {
     setMustHaveByDate('');
     setShowList(false);
     setSelectedCustomerForList(null);
-    alert('Special order list updated and rep notified!');
+
+    // Show success toast
+    setShowSubmissionSuccess(true);
+    setTimeout(() => setShowSubmissionSuccess(false), 3000);
   };
 
   const deleteProduct = async (productId) => {
@@ -1487,8 +1536,21 @@ const WineDistributorApp = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'All Orders');
 
-    // Save the file
-    XLSX.writeFile(workbook, `AOC_Orders_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // Generate binary string
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+    // Create Blob
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+    // Manual Download
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AOC_Orders_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const generateSpecialOrderReport = () => {
@@ -1532,7 +1594,22 @@ const WineDistributorApp = () => {
     const worksheet = XLSX.utils.json_to_sheet(allItems);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Special Order Requests');
-    XLSX.writeFile(workbook, `AOC_Special_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    // Generate binary string
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+    // Create Blob
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+    // Manual Download
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AOC_Special_Orders_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const handleStatusSyncUpload = async (e) => {
@@ -1678,7 +1755,22 @@ const WineDistributorApp = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Active Catalog');
 
     // Save the file
-    XLSX.writeFile(workbook, `AOC_Active_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
+    // Save the file
+    // Generate binary string
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+
+    // Create Blob
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+
+    // Manual Download
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AOC_Active_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const filteredProducts = products.filter(product => {
@@ -2011,7 +2103,16 @@ const WineDistributorApp = () => {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-                  <h3 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">Login As Customer</h3>
+                  <div className="flex items-center space-x-4">
+                    <h3 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight">Login As Customer</h3>
+                    <button
+                      onClick={() => setShowCreateUserModal(true)}
+                      className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-rose-700 transition-all flex items-center space-x-1"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      <span>Create New</span>
+                    </button>
+                  </div>
                   <button
                     onClick={() => setShowImpersonationModal(false)}
                     className="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all"
@@ -2058,6 +2159,66 @@ const WineDistributorApp = () => {
             </div>
           )}
 
+          {/* Create User Modal (Quick Admin) */}
+          {showCreateUserModal && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center mb-8">
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Create Customer</h2>
+                  <button
+                    onClick={() => setShowCreateUserModal(false)}
+                    className="p-2 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateCustomer} className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Establishment Name / Username</label>
+                    <input
+                      type="text"
+                      value={newCustomerData.username}
+                      onChange={(e) => setNewCustomerData({ ...newCustomerData, username: e.target.value })}
+                      placeholder="e.g. Chez Panisse"
+                      autoFocus
+                      className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all font-medium text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Email <span className="font-normal lowercase italic text-[9px]">(optional)</span></label>
+                      <input
+                        type="email"
+                        value={newCustomerData.email}
+                        onChange={(e) => setNewCustomerData({ ...newCustomerData, email: e.target.value })}
+                        placeholder="Auto-generated if empty"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Password <span className="font-normal lowercase italic text-[9px]">(optional)</span></label>
+                      <input
+                        type="text"
+                        value={newCustomerData.password}
+                        onChange={(e) => setNewCustomerData({ ...newCustomerData, password: e.target.value })}
+                        placeholder="Same as username if empty"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-4 bg-[#1a1a1a] dark:bg-rose-600 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95 mt-4"
+                  >
+                    Create Account
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
           <div className="p-8 max-w-7xl mx-auto">
 
             {/* Stats Cards */}
@@ -2072,8 +2233,22 @@ const WineDistributorApp = () => {
                   </div>
                   <div className="px-3 py-1 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full opacity-0 group-hover:opacity-100 transition-opacity">EXPORT XLS</div>
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">Active Catalog</p>
-                <p className="text-4xl font-extrabold text-slate-900 dark:text-white mt-2 tracking-tight">{products.length}</p>
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">Active Catalog</p>
+                    <p className="text-4xl font-extrabold text-slate-900 dark:text-white mt-2 tracking-tight">{products.length}</p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCreateUserModal(true);
+                    }}
+                    className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-white dark:hover:bg-slate-700 shadow-sm border border-transparent hover:border-slate-100 transition-all"
+                    title="Quick Create Customer"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                  </button>
+                </div>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-2 font-medium italic">Unique products</p>
               </div>
 
@@ -4340,6 +4515,18 @@ const WineDistributorApp = () => {
           </div>
         )
       }
+
+      {showSubmissionSuccess && (
+        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[200] bg-emerald-500 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center space-x-3 animate-in slide-in-from-top duration-500">
+          <div className="bg-white/20 p-2 rounded-full">
+            <Check className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-sm">Request Submitted!</p>
+            <p className="text-xs text-emerald-100 font-medium">Your rep has been notified.</p>
+          </div>
+        </div>
+      )}
     </div >
   );
 };
