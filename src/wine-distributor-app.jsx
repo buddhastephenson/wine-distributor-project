@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink, LayoutGrid, List, Sun, Moon, ArrowUpDown, ArrowUp, ArrowDown, Check, UserPlus /*, Save*/ } from 'lucide-react'; // Commented out Save to suppress warning if unused
+import { Upload, Wine, Package, Users, LogOut, X, Search, ShoppingCart, FileSpreadsheet, Settings, ChevronDown, ChevronRight, ClipboardList, ListPlus, UserCheck, Edit, Trash2, Download, Plus, ExternalLink, LayoutGrid, List, Sun, Moon, ArrowUp, ArrowDown, Check, UserPlus /*, Save*/ } from 'lucide-react'; // Commented out Save to suppress warning if unused
 import * as XLSX from 'xlsx';
 
 const WineDistributorApp = () => {
@@ -90,7 +90,7 @@ const WineDistributorApp = () => {
   const [taxonomy, setTaxonomy] = useState({});
   const [useManualLocation, setUseManualLocation] = useState(false);
   const [priceRange, setPriceRange] = useState([0, 1000]); // [min, max]
-  const [catalogPriceBounds, setCatalogPriceBounds] = useState({ min: 0, max: 1000 });
+  /* const [catalogPriceBounds, setCatalogPriceBounds] = useState({ min: 0, max: 1000 }); */
   const [orderNotes, setOrderNotes] = useState({}); // { username: "note content" }
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [newProductData, setNewProductData] = useState({
@@ -212,7 +212,7 @@ const WineDistributorApp = () => {
   const [authMode, setAuthMode] = useState('login');
   const [authUsername, setAuthUsername] = useState('');
   const [authPassword, setAuthPassword] = useState('');
-  const [authUserType, setAuthUserType] = useState('customer');
+  /* const [authUserType, setAuthUserType] = useState('customer'); */
   const [authEmail, setAuthEmail] = useState('');
   const [authError, setAuthError] = useState('');
   const [resetToken, setResetToken] = useState('');
@@ -1457,6 +1457,7 @@ const WineDistributorApp = () => {
     }
   };
 
+  /*
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     const updatedOrders = orders.map(order =>
       order.id === orderId ? { ...order, status: newStatus } : order
@@ -1465,6 +1466,7 @@ const WineDistributorApp = () => {
     setUploadStatus(`Order status updated to ${newStatus}`);
     setTimeout(() => setUploadStatus(''), 3000);
   };
+  */
 
   const handleUpdateOrderNote = async (orderId, note) => {
     const updatedOrders = orders.map(order =>
@@ -1489,7 +1491,7 @@ const WineDistributorApp = () => {
     const reportData = [];
     orders.forEach(order => {
       // Filter out orders from deleted users
-      const isValidUser = allUsers.some(u => u.username === order.customer || u.companyName === order.customer);
+      /* const isValidUser = allUsers.some(u => u.username === order.customer || u.companyName === order.customer); */
       // Also allow if it's a legacy order from a user who might have been renamed? 
       // User wants to PURGE deleted users. So strict check is good.
       // But wait, "Admin" is a customer type?
