@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "Wine distribution management system for AOC Wines",
   "private": true,
-  "homepage": ".",
-  "proxy": "http://localhost:3001",
+  "proxy": "http://localhost:3002",
   "dependencies": {
+    "@types/react-router-dom": "^5.3.3",
+    "axios": "^1.13.4",
     "body-parser": "^2.2.2",
-    "concurrently": "^9.2.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "lucide-react": "^0.263.1",
@@ -15,23 +15,45 @@
     "multer": "^2.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "xlsx": "^0.18.5"
+    "react-router-dom": "^7.13.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "concurrently \"react-scripts start\" \"npm run server\"",
-    "server": "node server.js",
+    "start": "node dist/server/app.js",
+    "dev": "concurrently \"react-scripts start\" \"PORT=3002 TS_NODE_TRANSPILE_ONLY=true nodemon src/server/app.ts\"",
+    "build:server": "tsc -p src/server",
+    "start:server": "node dist/server/app.js",
+    "server": "TS_NODE_TRANSPILE_ONLY=true nodemon src/server/app.ts",
+    "client": "react-scripts start",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d build",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "type-check": "tsc --noEmit"
   },
   "devDependencies": {
-    "react-scripts": "5.0.1"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^25.2.2",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "@types/xlsx": "^0.0.35",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^10.0.0",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.8.1",
+    "react-scripts": "5.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   },
   "eslintConfig": {
     "extends": [

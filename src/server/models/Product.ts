@@ -1,8 +1,9 @@
-const mongoose = require('mongoose');
+import mongoose, { Schema } from 'mongoose';
+import { IProduct } from '../../shared/types';
 
-const ProductSchema = new mongoose.Schema({
+const ProductSchema: Schema = new Schema({
     id: { type: String, required: true, unique: true },
-    itemCode: { type: String, required: true }, // Removed unique: true to support legacy data duplicates
+    itemCode: { type: String, required: true },
     producer: { type: String, required: true },
     productName: { type: String, required: true },
     vintage: { type: String, default: '' },
@@ -18,7 +19,7 @@ const ProductSchema = new mongoose.Schema({
     uploadDate: { type: Date, default: Date.now }
 }, {
     timestamps: true,
-    strict: false // Allow other fields if data structure varies
+    strict: false // Allow other fields if data structure varies (legacy behavior)
 });
 
-module.exports = mongoose.model('Product', ProductSchema);
+export default mongoose.model<IProduct>('Product', ProductSchema);

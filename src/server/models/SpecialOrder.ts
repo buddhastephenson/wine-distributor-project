@@ -1,10 +1,11 @@
-const mongoose = require('mongoose');
+import mongoose, { Schema } from 'mongoose';
+import { ISpecialOrder } from '../../shared/types';
 
-const SpecialOrderSchema = new mongoose.Schema({
+const SpecialOrderSchema: Schema = new Schema({
     id: { type: String, required: true, unique: true },
-    username: { type: String, required: true, index: true }, // Links to User.username
+    username: { type: String, required: true, index: true },
     itemCode: { type: String, required: true },
-    productId: { type: String }, // Links to Product.id (original source)
+    productId: { type: String },
     producer: { type: String },
     productName: { type: String },
     vintage: { type: String },
@@ -28,8 +29,10 @@ const SpecialOrderSchema = new mongoose.Schema({
     notes: { type: String, default: '' },
     adminNotes: { type: String, default: '' },
     submitted: { type: Boolean, default: false },
-    isArchived: { type: Boolean, default: false }, // Tracks if item has been added to historical orders,
+    isArchived: { type: Boolean, default: false },
     hasUnseenUpdate: { type: Boolean, default: false }
-}, { timestamps: true });
+}, {
+    timestamps: true
+});
 
-module.exports = mongoose.model('SpecialOrder', SpecialOrderSchema);
+export default mongoose.model<ISpecialOrder>('SpecialOrder', SpecialOrderSchema);

@@ -1,7 +1,8 @@
-const mongoose = require('mongoose');
+import mongoose, { Schema } from 'mongoose';
+import { IUser } from '../../shared/types';
 
-const UserSchema = new mongoose.Schema({
-    id: { type: String, required: true, unique: true }, // Keeping string ID to match existing logic for now
+const UserSchema: Schema = new Schema({
+    id: { type: String, required: true, unique: true }, // custom ID
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     type: { type: String, enum: ['admin', 'customer'], default: 'customer' },
@@ -10,6 +11,8 @@ const UserSchema = new mongoose.Schema({
     accessRevoked: { type: Boolean, default: false },
     resetToken: { type: String },
     resetTokenExpiry: { type: Number }
-}, { timestamps: true });
+}, {
+    timestamps: true
+});
 
-module.exports = mongoose.model('User', UserSchema);
+export default mongoose.model<IUser>('User', UserSchema);

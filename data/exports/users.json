@@ -1,0 +1,189 @@
+[
+  {
+    "id": "user-1769562272835",
+    "accessRevoked": false,
+    "createdAt": "2026-02-04T02:47:45.222Z",
+    "email": "trey@aoc-tn.com",
+    "isSuperAdmin": true,
+    "password": "Richelieu",
+    "type": "admin",
+    "updatedAt": "2026-02-04T04:49:02.165Z",
+    "username": "Trey"
+  },
+  {
+    "id": "user-1769688801637",
+    "accessRevoked": false,
+    "createdAt": "2026-02-04T02:47:45.482Z",
+    "email": "matt.cory@gmail.com",
+    "isSuperAdmin": true,
+    "password": "bevdataai",
+    "type": "admin",
+    "updatedAt": "2026-02-04T04:49:02.207Z",
+    "username": "Matt Cory"
+  },
+  {
+    "id": "user-1769740762551",
+    "accessRevoked": false,
+    "createdAt": "2026-02-04T02:47:45.483Z",
+    "email": "admin@aocwines.com",
+    "isSuperAdmin": false,
+    "password": "donoevil",
+    "type": "customer",
+    "updatedAt": "2026-02-05T01:57:34.504Z",
+    "username": "Monkey"
+  },
+  {
+    "id": "user-1770232351717",
+    "username": "Sara",
+    "password": "Chattanooga",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "sara@aoc-tn.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-04T19:12:31.720Z",
+    "updatedAt": "2026-02-04T19:12:31.720Z"
+  },
+  {
+    "id": "user-1770232384170",
+    "username": "Andrew",
+    "password": "Memphis",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "andrew@aoc-tn.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-04T19:13:04.171Z",
+    "updatedAt": "2026-02-04T19:13:04.171Z"
+  },
+  {
+    "id": "user-1770232425745",
+    "username": "Dalten",
+    "password": "Chattanooga",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "dalten@aoc-tn.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-04T19:13:45.745Z",
+    "updatedAt": "2026-02-04T19:13:45.745Z"
+  },
+  {
+    "id": "user-1770232448363",
+    "username": "Chris",
+    "password": "Austin",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "chris@aoc-tn.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-04T19:14:08.364Z",
+    "updatedAt": "2026-02-04T19:14:08.364Z"
+  },
+  {
+    "id": "user-1770271383723",
+    "username": "Luddite",
+    "password": "Luddite",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "luddite@hotmail.com",
+    "accessRevoked": true,
+    "createdAt": "2026-02-05T06:03:03.730Z",
+    "updatedAt": "2026-02-06T18:36:40.216Z"
+  },
+  {
+    "id": "user-1770271724479",
+    "username": "testuser",
+    "password": "password123",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "test@example.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-05T06:08:44.480Z",
+    "updatedAt": "2026-02-05T06:08:44.480Z"
+  },
+  {
+    "id": "user-1770271880507",
+    "username": "TestUserCase",
+    "password": "password123",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "case@example.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-05T06:11:20.508Z",
+    "updatedAt": "2026-02-05T06:11:20.508Z"
+  },
+  {
+    "id": "user-1770271950763",
+    "username": "TestEmailSim",
+    "password": "password123",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "sim@example.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-05T06:12:30.766Z",
+    "updatedAt": "2026-02-05T06:12:30.766Z"
+  },
+  {
+    "id": "user-1770272567182",
+    "username": "TestDelRecRel",
+    "password": "password123",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "delete_test@example.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-05T06:22:47.182Z",
+    "updatedAt": "2026-02-05T06:22:47.182Z"
+  },
+  {
+    "id": "user-1770272729625",
+    "username": "new user",
+    "password": "newuser",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "trey.stephenson@gmail.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-05T06:25:29.629Z",
+    "updatedAt": "2026-02-05T06:25:29.629Z"
+  },
+  {
+    "id": "user-1770336076282",
+    "username": "Butterlamp",
+    "password": "Butterlamp",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "butterlamp@placeholder.aocwines.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-06T00:01:16.286Z",
+    "updatedAt": "2026-02-06T00:01:16.286Z"
+  },
+  {
+    "id": "user-1770336562901",
+    "username": "Wine Chap",
+    "password": "Wine Chap",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "winechap@placeholder.aocwines.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-06T00:09:22.904Z",
+    "updatedAt": "2026-02-06T00:09:22.904Z"
+  },
+  {
+    "id": "user-1770337469296",
+    "username": "AdminTester",
+    "password": "Adminpassword",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "test@test.com",
+    "accessRevoked": false,
+    "createdAt": "2026-02-06T00:24:29.297Z",
+    "updatedAt": "2026-02-06T00:24:29.297Z"
+  },
+  {
+    "id": "user-1770402934999",
+    "username": "Gorillaz",
+    "password": "trey",
+    "type": "customer",
+    "isSuperAdmin": false,
+    "email": "trey@yahoo.com",
+    "accessRevoked": true,
+    "createdAt": "2026-02-06T18:35:35.004Z",
+    "updatedAt": "2026-02-06T18:36:41.731Z"
+  }
+]
