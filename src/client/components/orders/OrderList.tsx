@@ -31,7 +31,18 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                                     <span className="text-[10px] font-bold text-white bg-rose-500 px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse">Update</span>
                                 )}
                             </div>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{item.productName}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-1">{item.productName}</p>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                    {item.vintage || 'NV'}
+                                </span>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                    {item.bottleSize}
+                                </span>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                    {item.packSize}pk
+                                </span>
+                            </div>
                             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">${item.frontlinePrice} / unit</p>
                         </div>
                         {!isReadOnly && (!item.submitted || currentUser?.type === 'admin') && (
@@ -72,11 +83,11 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
 
                     <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
                         <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${(item.status || 'Requested').toUpperCase().includes('REQUESTED') ? 'bg-slate-50 text-slate-400 border-slate-100' :
-                                (item.status || '').toUpperCase().includes('ORDERED') ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                    (item.status || '').toUpperCase().includes('STOCK') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                        (item.status || '').toUpperCase().includes('BACKORDERED') ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                            (item.status || '').toUpperCase().includes('DELIVERED') ? 'bg-green-50 text-green-700 border-green-100' :
-                                                'bg-rose-50 text-rose-600 border-rose-100'
+                            (item.status || '').toUpperCase().includes('ORDERED') ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                (item.status || '').toUpperCase().includes('STOCK') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                    (item.status || '').toUpperCase().includes('BACKORDERED') ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                        (item.status || '').toUpperCase().includes('DELIVERED') ? 'bg-green-50 text-green-700 border-green-100' :
+                                            'bg-rose-50 text-rose-600 border-rose-100'
                             }`}>
                             {item.status || 'Requested'}
                         </span>

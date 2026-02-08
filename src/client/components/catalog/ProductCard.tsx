@@ -95,10 +95,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                         </div>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest mb-1">
+                        <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
                             {product.packSize}pk • {product.bottleSize}
                         </p>
-                        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 tracking-wide uppercase">
+                        <p className="text-sm font-black text-slate-900 dark:text-white tracking-wide uppercase">
                             {product.vintage || 'NV'}
                         </p>
                     </div>

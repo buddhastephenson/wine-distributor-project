@@ -75,6 +75,23 @@ export const CatalogPage: React.FC = () => {
             }
 
             return true;
+        }).sort((a, b) => {
+            // 1. Sort by Producer (A-Z)
+            const producerDiff = (a.producer || '').localeCompare(b.producer || '');
+            if (producerDiff !== 0) return producerDiff;
+
+            // 2. Sort by Product Name (A-Z)
+            const nameDiff = (a.productName || '').localeCompare(b.productName || '');
+            if (nameDiff !== 0) return nameDiff;
+
+            // 3. Sort by Bottle Size (750ml first)
+            const getRank = (size: string | undefined) => {
+                if (!size) return 2;
+                const s = size.toLowerCase();
+                if (s.includes('750') || s.includes('0.75')) return 0;
+                return 1;
+            };
+            return getRank(a.bottleSize) - getRank(b.bottleSize);
         });
     }, [products, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, priceRange, formulas]);
 
