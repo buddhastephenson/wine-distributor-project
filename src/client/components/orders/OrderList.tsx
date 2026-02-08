@@ -1,6 +1,8 @@
 import React from 'react';
 import { ISpecialOrder, IUser } from '../../../shared/types';
 import { X, Check } from 'lucide-react';
+import { OrderChat } from './OrderChat';
+import { v4 as uuidv4 } from 'uuid'; // You might need to install this or use a simple generator
 
 interface OrderListProps {
     orders: ISpecialOrder[];
@@ -19,9 +21,28 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
         );
     }
 
+    const handleSendMessage = (orderId: string, text: string) => {
+        if (!currentUser) return;
+
+        const orderIndex = orders.findIndex(o => o.id === orderId);
+        if (orderIndex === -1) return;
+
+        const order = orders[orderIndex];
+        const newMessage = {
+            id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            text,
+            sender: currentUser.username,
+            timestamp: new Date().toISOString(),
+            isAdmin: currentUser.type === 'admin'
+        };
+
+        const updatedMessages = [...(order.messages || []), newMessage];
+        onUpdate(orderId, { messages: updatedMessages, hasUnseenUpdate: true });
+    };
+
     return (
         <div className="space-y-4">
-            {orders.slice().reverse().map(item => (
+            {orders.map(item => (
                 <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 hover:shadow-md transition-all duration-200">
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex-1 pr-4">
@@ -80,6 +101,14 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                             />
                         </div>
                     </div>
+
+                    <OrderChat
+                        orderId={item.id}
+                        messages={item.messages || []}
+                        currentUser={currentUser}
+                        onSendMessage={handleSendMessage}
+                        isReadOnly={isReadOnly}
+                    />
 
                     <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
                         <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${(item.status || 'Requested').toUpperCase().includes('REQUESTED') ? 'bg-slate-50 text-slate-400 border-slate-100' :

@@ -9,8 +9,17 @@ export const OrdersPage: React.FC = () => {
     const { user } = useAuthStore();
 
     useEffect(() => {
-        fetchSpecialOrders(user?.username);
-    }, [fetchSpecialOrders, user?.username]);
+        // If admin and not impersonating (user.username is admin's), we might want to see ALL?
+        // But the current logic passes user?.username.
+        // If we want "Organized by Customer", implied we see multiple customers.
+        // Let's pass undefined if admin to get all, UNLESS we want to filter by a specific user (which we don't have UI for here yet)
+        // If user is admin type, fetch ALL.
+        if (user?.type === 'admin') {
+            fetchSpecialOrders(); // Fetch all for admin
+        } else {
+            fetchSpecialOrders(user?.username);
+        }
+    }, [fetchSpecialOrders, user?.username, user?.type]);
 
     const handleUpdate = (id: string, updates: any) => {
         updateSpecialOrder(id, updates);
@@ -25,8 +34,57 @@ export const OrdersPage: React.FC = () => {
     // Separate into "Cart" (Pending Submission) and "History" (Submitted)
     // Assuming 'submitted' flag is used. If not present, we might assume status 'pending' is not submitted.
     // In legacy code, addSpecialOrder sets submitted: false, status: 'pending'.
-    const pendingOrders = useMemo(() => specialOrders.filter(o => !o.submitted), [specialOrders]);
-    const submittedOrders = useMemo(() => specialOrders.filter(o => o.submitted), [specialOrders]);
+    // Separate into "Cart" (Pending Submission) and "History" (Submitted)
+    const pendingOrders = useMemo(() => {
+        const filtered = specialOrders.filter(o => !o.submitted);
+        return filtered.sort((a, b) => {
+            // Group by Customer for Admins (if multiple customers present)
+            if (user?.type === 'admin') {
+                const customerDiff = (a.username || '').localeCompare(b.username || '');
+                if (customerDiff !== 0) return customerDiff;
+            }
+            // Newest First
+            const dateA = new Date(a.createdAt || a.uploadDate || 0).getTime();
+            const dateB = new Date(b.createdAt || b.uploadDate || 0).getTime();
+            return dateB - dateA;
+        });
+    }, [specialOrders, user?.type]);
+
+    const submittedOrders = useMemo(() => {
+        const filtered = specialOrders.filter(o => o.submitted);
+        return filtered.sort((a, b) => {
+            // Group by Customer for Admins
+            if (user?.type === 'admin') {
+                const customerDiff = (a.username || '').localeCompare(b.username || '');
+                if (customerDiff !== 0) return customerDiff;
+            }
+            // Newest First
+            const dateA = new Date(a.createdAt || a.uploadDate || 0).getTime();
+            const dateB = new Date(b.createdAt || b.uploadDate || 0).getTime();
+            return dateB - dateA;
+        });
+    }, [specialOrders, user?.type]);
+
+    // For Admins: Group by Customer
+    const groupedPendingOrders = useMemo(() => {
+        if (user?.type !== 'admin') return {};
+        return pendingOrders.reduce((acc, order) => {
+            const customer = order.username || 'Unknown';
+            if (!acc[customer]) acc[customer] = [];
+            acc[customer].push(order);
+            return acc;
+        }, {} as Record<string, typeof pendingOrders>);
+    }, [pendingOrders, user?.type]);
+
+    const groupedSubmittedOrders = useMemo(() => {
+        if (user?.type !== 'admin') return {};
+        return submittedOrders.reduce((acc, order) => {
+            const customer = order.username || 'Unknown';
+            if (!acc[customer]) acc[customer] = [];
+            acc[customer].push(order);
+            return acc;
+        }, {} as Record<string, typeof submittedOrders>);
+    }, [submittedOrders, user?.type]);
 
     const handleSubmitRequest = async () => {
         if (window.confirm(`Submit request for ${pendingOrders.length} items?`)) {
@@ -93,12 +151,30 @@ export const OrdersPage: React.FC = () => {
                 </div>
 
                 {pendingOrders.length > 0 ? (
-                    <OrderList
-                        orders={pendingOrders}
-                        currentUser={user}
-                        onUpdate={handleUpdate}
-                        onDelete={handleDelete}
-                    />
+                    user?.type === 'admin' ? (
+                        <div className="space-y-8">
+                            {Object.entries(groupedPendingOrders).map(([customer, orders]) => (
+                                <div key={customer} className="space-y-3">
+                                    <h4 className="text-sm font-black text-rose-500 uppercase tracking-widest px-4 border-b border-rose-100 pb-2">
+                                        Customer: {customer}
+                                    </h4>
+                                    <OrderList
+                                        orders={orders}
+                                        currentUser={user}
+                                        onUpdate={handleUpdate}
+                                        onDelete={handleDelete}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <OrderList
+                            orders={pendingOrders}
+                            currentUser={user}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                        />
+                    )
                 ) : (
                     <div className="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                         <p className="text-slate-400 font-medium">Your request list is empty.</p>
@@ -120,13 +196,32 @@ export const OrdersPage: React.FC = () => {
                             <span>Update Request</span>
                         </button>
                     </div>
-                    <OrderList
-                        orders={submittedOrders}
-                        currentUser={user}
-                        onUpdate={handleUpdate}
-                        onDelete={handleDelete}
-                        isReadOnly={false}
-                    />
+                    {user?.type === 'admin' ? (
+                        <div className="space-y-8">
+                            {Object.entries(groupedSubmittedOrders).map(([customer, orders]) => (
+                                <div key={customer} className="space-y-3">
+                                    <h4 className="text-sm font-black text-rose-500 uppercase tracking-widest px-4 border-b border-rose-100 pb-2">
+                                        Customer: {customer}
+                                    </h4>
+                                    <OrderList
+                                        orders={orders}
+                                        currentUser={user}
+                                        onUpdate={handleUpdate}
+                                        onDelete={handleDelete}
+                                        isReadOnly={false}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <OrderList
+                            orders={submittedOrders}
+                            currentUser={user}
+                            onUpdate={handleUpdate}
+                            onDelete={handleDelete}
+                            isReadOnly={false}
+                        />
+                    )}
                 </div>
             )}
         </div>

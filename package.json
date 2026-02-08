@@ -9,6 +9,7 @@
     "axios": "^1.13.4",
     "body-parser": "^2.2.2",
     "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
     "express": "^5.2.1",
     "lucide-react": "^0.263.1",
     "mongoose": "^9.1.5",
@@ -16,6 +17,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.13.0",
+    "uuid": "^13.0.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
@@ -44,6 +46,7 @@
     "@types/node": "^25.2.2",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
+    "@types/uuid": "^10.0.0",
     "@types/xlsx": "^0.0.35",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",

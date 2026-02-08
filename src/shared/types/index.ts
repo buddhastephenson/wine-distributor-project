@@ -66,6 +66,16 @@ export interface ISpecialOrder {
     submitted?: boolean;
     isArchived?: boolean;
     hasUnseenUpdate?: boolean;
+    messages?: IOrderMessage[];
+    createdAt?: string | Date; // Added for sorting
+}
+
+export interface IOrderMessage {
+    id: string;
+    text: string;
+    sender: string; // username
+    timestamp: string | Date;
+    isAdmin: boolean;
 }
 
 export interface IAuthResponse {

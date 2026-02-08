@@ -30,7 +30,14 @@ const SpecialOrderSchema: Schema = new Schema({
     adminNotes: { type: String, default: '' },
     submitted: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
-    hasUnseenUpdate: { type: Boolean, default: false }
+    hasUnseenUpdate: { type: Boolean, default: false },
+    messages: [{
+        id: String,
+        text: String,
+        sender: String,
+        timestamp: Date,
+        isAdmin: Boolean
+    }]
 }, {
     timestamps: true
 });

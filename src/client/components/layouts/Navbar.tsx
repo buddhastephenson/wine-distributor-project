@@ -16,28 +16,33 @@ export const Navbar: React.FC = () => {
                             <h1 className="text-xl font-bold text-gray-900">AOC</h1>
                         </div>
                         <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                            <NavLink
-                                to="/catalog"
-                                className={({ isActive }) =>
-                                    `inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
-                                        ? 'border-indigo-500 text-gray-900'
-                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                                    }`
-                                }
-                            >
-                                Catalog
-                            </NavLink>
-                            <NavLink
-                                to="/orders"
-                                className={({ isActive }) =>
-                                    `inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
-                                        ? 'border-indigo-500 text-gray-900'
-                                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                                    }`
-                                }
-                            >
-                                My Wish List
-                            </NavLink>
+                            {/* Hide links if user is admin (unless impersonating, where user.type would be customer) */}
+                            {user?.type !== 'admin' && (
+                                <>
+                                    <NavLink
+                                        to="/catalog"
+                                        className={({ isActive }) =>
+                                            `inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
+                                                ? 'border-indigo-500 text-gray-900'
+                                                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                            }`
+                                        }
+                                    >
+                                        Catalog
+                                    </NavLink>
+                                    <NavLink
+                                        to="/orders"
+                                        className={({ isActive }) =>
+                                            `inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
+                                                ? 'border-indigo-500 text-gray-900'
+                                                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                            }`
+                                        }
+                                    >
+                                        My Wish List
+                                    </NavLink>
+                                </>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center space-x-4">

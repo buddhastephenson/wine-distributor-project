@@ -46,8 +46,9 @@ const App: React.FC = () => {
                                 <Routes>
                                     <Route path="/" element={<AdminDashboard />} />
                                     <Route path="/users" element={<UsersPage />} />
-                                    {/* <Route path="/products" element={<ProductsPage />} /> */}
-                                    {/* <Route path="/orders" element={<OrdersPage />} /> */}
+                                    <Route path="/products" element={<CatalogPage />} />
+                                    <Route path="/orders" element={<OrdersPage />} />
+                                    <Route path="/settings" element={<div className="p-8 text-center text-gray-500">Settings Page (Coming Soon)</div>} />
                                     <Route path="*" element={<Navigate to="/admin" replace />} />
                                 </Routes>
                             </AdminLayout>

@@ -150,7 +150,8 @@ export const CatalogPage: React.FC = () => {
         }
 
         addSpecialOrder(payload);
-        alert(`Added ${validProductName} to your list.`);
+        // Ideally show a toast here instead of an alert
+        // alert(`Added ${validProductName} to your list.`);
     };
 
     const resetFilters = () => {
