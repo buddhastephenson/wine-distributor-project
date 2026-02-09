@@ -10,8 +10,14 @@ class UserService {
         return await User.findOne({ id }, '-password -__v');
     }
 
-    async updateUserRole(id: string, type: 'admin' | 'customer'): Promise<IUser | null> {
-        return await User.findOneAndUpdate({ id }, { type }, { new: true });
+    async updateUserRole(id: string, type: 'admin' | 'customer', vendors?: string[]): Promise<IUser | null> {
+        const updateData: any = { type };
+        if (vendors) {
+            updateData.vendors = vendors;
+        } else if (type === 'customer') {
+            updateData.vendors = [];
+        }
+        return await User.findOneAndUpdate({ id }, updateData, { new: true });
     }
 
     async toggleAccess(id: string, accessRevoked: boolean): Promise<IUser | null> {

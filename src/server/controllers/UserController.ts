@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import UserService from '../services/UserService';
+import AuthService from '../services/AuthService';
+
 
 class UserController {
     async getAllUsers(req: Request, res: Response) {
@@ -11,16 +13,30 @@ class UserController {
         }
     }
 
+    async quickCreate(req: Request, res: Response) {
+        console.log('UserController.quickCreate called with body:', req.body);
+        try {
+            const { username } = req.body;
+            const result = await AuthService.quickCreateCustomer(username);
+            if (!result.success) {
+                return res.status(400).json(result);
+            }
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+
     async updateUserRole(req: Request, res: Response) {
         const { id } = req.params;
-        const { type } = req.body;
+        const { type, vendors } = req.body;
 
         if (type !== 'admin' && type !== 'customer') {
             return res.status(400).json({ error: 'Invalid role type' });
         }
 
         try {
-            const user = await UserService.updateUserRole(id as string, type);
+            const user = await UserService.updateUserRole(id as string, type, vendors);
             if (!user) return res.status(404).json({ error: 'User not found' });
             res.json({ success: true, user });
         } catch (error) {

@@ -13,9 +13,9 @@ interface StatsProps {
 export const DashboardStats: React.FC<StatsProps> = ({ userCount, productCount, orderCount, pendingCount }) => {
     const stats = [
         { name: 'Total Users', value: userCount, icon: <Users size={24} className="text-blue-500" />, link: '/admin/users', action: 'Manage Users' },
-        { name: 'Active Products', value: productCount, icon: <Package size={24} className="text-green-500" />, link: '/catalog', action: 'View Catalog' },
-        { name: 'Special Orders', value: orderCount, icon: <FileText size={24} className="text-purple-500" />, link: '/orders', action: 'Review Orders' },
-        { name: 'Pending Admin', value: pendingCount, icon: <AlertCircle size={24} className="text-orange-500" />, link: '/orders', action: 'Review Pending' },
+        { name: 'Active Products', value: productCount, icon: <Package size={24} className="text-green-500" />, link: '/admin/products', action: 'View Catalog' },
+        { name: 'Special Orders', value: orderCount, icon: <FileText size={24} className="text-purple-500" />, link: '/admin/orders', action: 'Review Orders' },
+        { name: 'Pending Admin', value: pendingCount, icon: <AlertCircle size={24} className="text-orange-500" />, link: '/admin/orders', action: 'Review Pending' },
     ];
 
     return (

@@ -6,6 +6,9 @@ const router = Router();
 // GET /api/auth/users
 router.get('/', UserController.getAllUsers.bind(UserController));
 
+// POST /api/auth/users/quick-create
+router.post('/quick-create', UserController.quickCreate.bind(UserController));
+
 // PATCH /api/auth/users/:id/access
 router.patch('/:id/access', UserController.toggleAccess.bind(UserController));
 

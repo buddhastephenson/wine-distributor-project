@@ -46,10 +46,15 @@ export const specialOrderApi = {
 export const userApi = {
     getAll: () => api.get<IUser[]>('/auth/users'),
     toggleAccess: (id: string, accessRevoked: boolean) => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/access`, { accessRevoked }),
-    updateRole: (id: string, type: 'admin' | 'customer') => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/role`, { type }),
+    updateRole: (id: string, type: 'admin' | 'customer', vendors?: string[]) => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/role`, { type, vendors }),
     updateUsername: (id: string, username: string) => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/username`, { username }),
     updatePassword: (id: string, password: string) => api.patch<{ success: boolean; message: string }>(`/auth/users/${id}/password`, { password }),
     delete: (id: string) => api.delete<{ success: boolean }>(`/auth/users/${id}`),
+    quickCreate: (username: string) => api.post<{ success: boolean; user: IUser }>('/auth/users/quick-create', { username }),
+};
+
+export const storageApi = {
+    updateFormulas: (formulas: any) => api.post<{ success: boolean }>('/storage/wine-formulas', { value: JSON.stringify(formulas) }),
 };
 
 export default api;

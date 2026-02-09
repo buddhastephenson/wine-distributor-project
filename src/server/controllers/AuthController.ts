@@ -15,6 +15,19 @@ class AuthController {
         }
     }
 
+    async quickCreate(req: Request, res: Response) {
+        try {
+            const { username } = req.body;
+            const result = await AuthService.quickCreateCustomer(username);
+            if (!result.success) {
+                return res.status(400).json(result);
+            }
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+
     async login(req: Request, res: Response) {
         try {
             const result = await AuthService.login(req.body);

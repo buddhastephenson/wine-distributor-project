@@ -1,27 +1,29 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { LayoutDashboard, Package, Users, FileText, Settings, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 
 export const Sidebar: React.FC = () => {
-    const { logout } = useAuthStore();
+    const { logout, user } = useAuthStore();
     const { isSidebarOpen } = useUIStore();
 
     if (!isSidebarOpen) return null;
 
+    const isSuperAdmin = user?.isSuperAdmin || ['Trey', 'Matt Cory', 'treystephenson'].includes(user?.username || '');
+
     const navItems = [
         { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/admin' },
         { name: 'Products', icon: <Package size={20} />, path: '/admin/products' },
-        { name: 'Users', icon: <Users size={20} />, path: '/admin/users' },
+        ...(isSuperAdmin ? [{ name: 'Users', icon: <Users size={20} />, path: '/admin/users' }] : []),
         { name: 'Orders', icon: <FileText size={20} />, path: '/admin/orders' },
-        { name: 'Settings', icon: <Settings size={20} />, path: '/admin/settings' },
+        ...(isSuperAdmin ? [{ name: 'Settings', icon: <Settings size={20} />, path: '/admin/settings' }] : []),
     ];
 
     return (
         <div className="flex flex-col w-64 bg-gray-900 h-screen text-white transition-all duration-300">
             <div className="flex items-center justify-center h-16 border-b border-gray-800">
-                <span className="text-xl font-bold">AOC Admin</span>
+                <Link to="/admin" className="text-xl font-bold hover:text-indigo-400 transition-colors">AOC Admin</Link>
             </div>
             <nav className="flex-1 overflow-y-auto py-4">
                 <ul className="space-y-1">

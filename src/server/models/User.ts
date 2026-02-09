@@ -7,6 +7,7 @@ const UserSchema: Schema = new Schema({
     password: { type: String, required: true },
     type: { type: String, enum: ['admin', 'customer'], default: 'customer' },
     isSuperAdmin: { type: Boolean, default: false },
+    vendors: { type: [String], default: [] },
     email: { type: String, required: true, unique: true },
     accessRevoked: { type: Boolean, default: false },
     resetToken: { type: String },

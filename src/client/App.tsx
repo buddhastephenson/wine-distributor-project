@@ -8,6 +8,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { UsersPage } from './pages/admin/UsersPage';
 import { CatalogPage } from './pages/catalog/CatalogPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
+import { SettingsPage } from './pages/admin/SettingsPage';
 import { useAuthStore } from './store/useAuthStore';
 
 // Protected Route Wrapper
@@ -48,7 +49,7 @@ const App: React.FC = () => {
                                     <Route path="/users" element={<UsersPage />} />
                                     <Route path="/products" element={<CatalogPage />} />
                                     <Route path="/orders" element={<OrdersPage />} />
-                                    <Route path="/settings" element={<div className="p-8 text-center text-gray-500">Settings Page (Coming Soon)</div>} />
+                                    <Route path="/settings" element={<SettingsPage />} />
                                     <Route path="*" element={<Navigate to="/admin" replace />} />
                                 </Routes>
                             </AdminLayout>

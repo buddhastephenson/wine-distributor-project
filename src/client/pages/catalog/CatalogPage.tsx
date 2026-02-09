@@ -3,12 +3,13 @@ import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { TaxonomySidebar } from '../../components/catalog/TaxonomySidebar';
 import { ProductGrid } from '../../components/catalog/ProductGrid';
-import { LayoutGrid, List } from 'lucide-react';
+import { LayoutGrid, List, CheckCircle, Download } from 'lucide-react';
 import { calculateFrontlinePrice } from '../../utils/formulas';
+import { exportProductsToExcel } from '../../utils/export';
 
 export const CatalogPage: React.FC = () => {
     const { products, formulas, isLoading, error, fetchProducts, fetchFormulas, addSpecialOrder } = useProductStore();
-    const { user } = useAuthStore();
+    const { user, isAuthenticated } = useAuthStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCountry, setSelectedCountry] = useState('all');
     const [selectedRegion, setSelectedRegion] = useState('all');
@@ -23,34 +24,42 @@ export const CatalogPage: React.FC = () => {
         fetchFormulas();
     }, [fetchProducts, fetchFormulas]);
 
+    // Base Product Set (Filtered by Vendor Role)
+    const allowedProducts = useMemo(() => {
+        if (user?.type === 'admin' && user?.vendors && user.vendors.length > 0) {
+            return products.filter(p => p.supplier && user.vendors!.includes(p.supplier));
+        }
+        return products;
+    }, [products, user]);
+
     // Derive Unique Filter Options
     const uniqueCountries = useMemo(() => {
-        const countries = new Set(products.map(p => p.country).filter(Boolean));
+        const countries = new Set(allowedProducts.map(p => p.country).filter(Boolean));
         return Array.from(countries).sort() as string[];
-    }, [products]);
+    }, [allowedProducts]);
 
     const uniqueRegions = useMemo(() => {
-        const regions = new Set(products.filter(p => selectedCountry === 'all' || p.country === selectedCountry).map(p => p.region).filter(Boolean));
+        const regions = new Set(allowedProducts.filter(p => selectedCountry === 'all' || p.country === selectedCountry).map(p => p.region).filter(Boolean));
         return Array.from(regions).sort() as string[];
-    }, [products, selectedCountry]);
+    }, [allowedProducts, selectedCountry]);
 
     const uniqueAppellations = useMemo(() => {
-        const appellations = new Set(products.filter(p =>
+        const appellations = new Set(allowedProducts.filter(p =>
             (selectedCountry === 'all' || p.country === selectedCountry) &&
             (selectedRegion === 'all' || p.region === selectedRegion)
         ).map(p => p.appellation).filter(Boolean));
         return Array.from(appellations).sort() as string[];
-    }, [products, selectedCountry, selectedRegion]); // Added selectedRegion dependency
+    }, [allowedProducts, selectedCountry, selectedRegion]);
 
     const uniqueSuppliers = useMemo(() => {
-        const suppliers = new Set(products.map(p => p.supplier).filter(Boolean));
+        const suppliers = new Set(allowedProducts.map(p => p.supplier).filter(Boolean));
         return Array.from(suppliers).sort() as string[];
-    }, [products]);
+    }, [allowedProducts]);
 
 
     // Filter Products
     const filteredProducts = useMemo(() => {
-        return products.filter(product => {
+        return allowedProducts.filter(product => {
             // Search Term
             const searchLower = searchTerm.toLowerCase();
             const matchesSearch = !searchTerm ||
@@ -93,9 +102,11 @@ export const CatalogPage: React.FC = () => {
             };
             return getRank(a.bottleSize) - getRank(b.bottleSize);
         });
-    }, [products, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, priceRange, formulas]);
+    }, [allowedProducts, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, priceRange, formulas]);
 
-    const handleAddProduct = (product: any, pricing: any) => {
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    const handleAddProduct = async (product: any, pricing: any) => {
         // Data Sanitization for weird import artifacts
         let validItemCode = product.itemCode;
         let validProductName = product.productName;
@@ -144,14 +155,9 @@ export const CatalogPage: React.FC = () => {
         };
         console.log('Adding Special Order Payload:', payload);
 
-        if (!payload.username) {
-            alert("Error: No username found. Please log in.");
-            return;
-        }
-
-        addSpecialOrder(payload);
-        // Ideally show a toast here instead of an alert
-        // alert(`Added ${validProductName} to your list.`);
+        await addSpecialOrder(payload);
+        setSuccessMessage(`Added ${validProductName} to your list.`);
+        window.scrollTo(0, 0);
     };
 
     const resetFilters = () => {
@@ -180,15 +186,30 @@ export const CatalogPage: React.FC = () => {
         );
     }
 
+    const handleCountryChange = (country: string) => {
+        setSelectedCountry(country);
+        setSelectedRegion('all');
+        setSelectedAppellation('all');
+    };
+
+    const handleRegionChange = (region: string) => {
+        setSelectedRegion(region);
+        setSelectedAppellation('all');
+    };
+
+    const handleExport = () => {
+        exportProductsToExcel(filteredProducts, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
     return (
         <div className="space-y-6 animate-fade-in-up">
             <TaxonomySidebar
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 selectedCountry={selectedCountry}
-                setSelectedCountry={setSelectedCountry}
+                setSelectedCountry={handleCountryChange}
                 selectedRegion={selectedRegion}
-                setSelectedRegion={setSelectedRegion}
+                setSelectedRegion={handleRegionChange}
                 selectedAppellation={selectedAppellation}
                 setSelectedAppellation={setSelectedAppellation}
                 selectedSupplier={selectedSupplier}
@@ -202,23 +223,43 @@ export const CatalogPage: React.FC = () => {
                 resetFilters={resetFilters}
             />
 
+            {successMessage && (
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-4 flex items-center justify-between animate-fade-in-up">
+                    <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-bold text-emerald-800 dark:text-emerald-200">{successMessage}</span>
+                    </div>
+                    <button onClick={() => setSuccessMessage(null)} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 font-bold text-sm">Dismiss</button>
+                </div>
+            )}
+
             <div className="flex justify-between items-center bg-white dark:bg-slate-900 px-6 py-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">
                     Viewing {filteredProducts.length} Products
                 </h2>
-                <div className="flex space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <div className="flex items-center space-x-4">
                     <button
-                        onClick={() => setViewMode('grid')}
-                        className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        onClick={handleExport}
+                        className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"
                     >
-                        <LayoutGrid className="w-5 h-5" />
+                        <Download className="w-4 h-4" />
+                        <span>Export Excel</span>
                     </button>
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        <List className="w-5 h-5" />
-                    </button>
+
+                    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow text-rose-600 dark:text-rose-400' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <LayoutGrid size={20} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <List className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
 

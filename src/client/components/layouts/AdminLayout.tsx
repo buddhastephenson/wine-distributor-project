@@ -1,7 +1,7 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 interface AdminLayoutProps {
     children: React.ReactNode;
@@ -16,7 +16,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             <div className="flex-1 flex flex-col overflow-hidden">
                 <header className="bg-white shadow">
                     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+                        <Link to="/admin">
+                            <h1 className="text-2xl font-bold text-gray-900 hover:text-indigo-600 transition-colors cursor-pointer">Admin Dashboard</h1>
+                        </Link>
                         <div className="flex items-center space-x-4">
                             {useAuthStore.getState().originalUser && (
                                 <button

@@ -19,6 +19,7 @@ interface ProductState {
     // Optimistic updates could be added here
     updateProduct: (id: string, updates: Partial<IProduct>) => Promise<void>;
     deleteProduct: (id: string) => Promise<void>;
+    updateFormulas: (formulas: IFormulas) => Promise<void>;
 }
 
 export const useProductStore = create<ProductState>((set, get) => ({
@@ -49,8 +50,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
     },
 
     addSpecialOrder: async (order) => {
+        console.log('useProductStore.addSpecialOrder called with:', order);
         try {
             const response = await specialOrderApi.create(order);
+            console.log('addSpecialOrder success:', response.data);
             if (response.data.success) {
                 set((state) => ({
                     specialOrders: [...state.specialOrders, response.data.order]
@@ -130,6 +133,17 @@ export const useProductStore = create<ProductState>((set, get) => ({
             set({ formulas });
         } catch (error: any) {
             console.error('Failed to fetch formulas:', error);
+        }
+    },
+
+    updateFormulas: async (newFormulas: IFormulas) => {
+        set({ formulas: newFormulas }); // Optimistic update
+        try {
+            const response = await import('../services/api').then(m => m.storageApi.updateFormulas(newFormulas));
+            if (!response.data.success) throw new Error('Failed to save formulas');
+        } catch (error) {
+            console.error('Failed to save formulas:', error);
+            // Revert or show error? For now just log
         }
     }
 }));

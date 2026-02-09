@@ -4,6 +4,7 @@ export interface IUser {
     type: 'admin' | 'customer';
     email: string;
     isSuperAdmin?: boolean;
+    vendors?: string[]; // Array of supplier names for Vendor Admins
     accessRevoked?: boolean;
     password?: string; // Optional as often excluded
     resetToken?: string;

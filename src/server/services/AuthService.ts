@@ -143,6 +143,48 @@ class AuthService {
             throw error;
         }
     }
+
+    async quickCreateCustomer(username: string): Promise<IAuthResponse> {
+        if (!username) return { success: false, error: 'Username is required' };
+
+        try {
+            // Check if username exists
+            const existingUser = await User.findOne({
+                username: { $regex: new RegExp(`^${username}$`, 'i') }
+            });
+
+            if (existingUser) {
+                return { success: false, error: 'Username already exists' };
+            }
+
+            // Generate dummy email to satisfy unique constraint
+            // e.g. "My Restaurant" -> "MyRestaurant-1739071234567@placeholder.local"
+            const sanitizedUsername = username.replace(/[^a-zA-Z0-9]/g, '');
+            const dummyEmail = `${sanitizedUsername}-${Date.now()}@placeholder.local`;
+
+            const newUser = await User.create({
+                id: `user-${Date.now()}`,
+                username,
+                password: username, // TODO: Hash password if we were doing hashing
+                type: 'customer',
+                email: dummyEmail
+            });
+
+            return {
+                success: true,
+                user: {
+                    id: newUser.id,
+                    username: newUser.username,
+                    type: 'customer',
+                    email: newUser.email
+                }
+            };
+        } catch (error) {
+            console.error('Quick Create Error:', error);
+            throw error;
+        }
+    }
 }
+
 
 export default new AuthService();
