@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import SpecialOrderController from '../controllers/SpecialOrderController';
+import { authenticate } from '../middleware/auth';
 
 const router = Router();
+
+router.use(authenticate);
 
 // GET /api/special-orders (optional ?username=...)
 router.get('/', SpecialOrderController.getAllSpecialOrders.bind(SpecialOrderController));
@@ -10,7 +13,10 @@ router.get('/', SpecialOrderController.getAllSpecialOrders.bind(SpecialOrderCont
 router.post('/', SpecialOrderController.createSpecialOrder.bind(SpecialOrderController));
 
 // PATCH /api/special-orders/:id
-router.patch('/:id', SpecialOrderController.updateSpecialOrder.bind(SpecialOrderController));
+// Batch Update (Must come before :id routes to avoid conflict if logic was different, though here 'batch-status' is distinct from ':id')
+router.post('/batch-status', authenticate, SpecialOrderController.batchUpdateStatus.bind(SpecialOrderController));
+
+router.put('/:id', authenticate, SpecialOrderController.updateSpecialOrder.bind(SpecialOrderController));
 
 // DELETE /api/special-orders/:id
 router.delete('/:id', SpecialOrderController.deleteSpecialOrder.bind(SpecialOrderController));

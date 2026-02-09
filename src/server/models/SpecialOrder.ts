@@ -25,7 +25,7 @@ const SpecialOrderSchema: Schema = new Schema({
     cases: { type: Number, default: 0 },
     bottles: { type: Number, default: 0 },
     quantity: { type: Number, default: 0 },
-    status: { type: String, default: 'Requested' },
+    status: { type: String, default: 'Pending' },
     notes: { type: String, default: '' },
     adminNotes: { type: String, default: '' },
     submitted: { type: Boolean, default: false },

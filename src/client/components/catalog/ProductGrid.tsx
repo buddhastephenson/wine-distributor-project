@@ -8,11 +8,12 @@ interface ProductGridProps {
     products: IProduct[];
     formulas: IFormulas | null;
     onAdd: (product: IProduct, pricing: any) => void;
+    onEdit?: (product: IProduct) => void;
     viewMode: 'grid' | 'list';
     isDarkMode?: boolean;
 }
 
-export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, onAdd, viewMode, isDarkMode }) => {
+export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, onAdd, onEdit, viewMode, isDarkMode }) => {
     if (viewMode === 'grid') {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
@@ -22,6 +23,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                         product={product}
                         formulas={formulas}
                         onAdd={onAdd}
+                        onEdit={onEdit}
                         isDarkMode={isDarkMode}
                     />
                 ))}

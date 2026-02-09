@@ -15,6 +15,7 @@ interface AuthState {
     clearError: () => void;
     impersonate: (user: IUser) => void;
     stopImpersonating: () => void;
+    verifySession: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -57,6 +58,27 @@ export const useAuthStore = create<AuthState>()(
                         error: error.response?.data?.error || 'Signup failed',
                         isLoading: false
                     });
+                }
+            },
+
+            verifySession: async () => {
+                // If not authenticated in state, don't bother verify (unless we want to support cookie-based persistence without local storage)
+                // But since we persist zustand, we might be "authenticated" but stale.
+                if (!get().isAuthenticated) return;
+
+                set({ isLoading: true });
+                try {
+                    const response = await authApi.verify();
+                    if (response.data.success && response.data.user) {
+                        set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+                    } else {
+                        // If token invalid, logout
+                        set({ user: null, isAuthenticated: false, isLoading: false });
+                    }
+                } catch (error) {
+                    console.error('Session verification failed', error);
+                    // If 401, logout
+                    set({ user: null, isAuthenticated: false, isLoading: false });
                 }
             },
 

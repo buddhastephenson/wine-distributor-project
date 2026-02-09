@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../shared/Card';
 import { Users, Package, FileText, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface StatsProps {
     userCount: number;
@@ -11,16 +12,28 @@ interface StatsProps {
 }
 
 export const DashboardStats: React.FC<StatsProps> = ({ userCount, productCount, orderCount, pendingCount }) => {
+    const user = useAuthStore(state => state.user);
+    const isRestrictedInfo = user?.type === 'admin' && user?.vendors && user.vendors.length > 0;
+
+    console.log('DashboardStats Debug:', {
+        username: user?.username,
+        vendors: user?.vendors,
+        type: user?.type,
+        isRestricted: isRestrictedInfo
+    });
+
     const stats = [
-        { name: 'Total Users', value: userCount, icon: <Users size={24} className="text-blue-500" />, link: '/admin/users', action: 'Manage Users' },
+        { name: 'Total Users', value: userCount, icon: <Users size={24} className="text-blue-500" />, link: '/admin/users', action: 'Manage Users', restricted: true }, // Mark as restricted
         { name: 'Active Products', value: productCount, icon: <Package size={24} className="text-green-500" />, link: '/admin/products', action: 'View Catalog' },
         { name: 'Special Orders', value: orderCount, icon: <FileText size={24} className="text-purple-500" />, link: '/admin/orders', action: 'Review Orders' },
-        { name: 'Pending Admin', value: pendingCount, icon: <AlertCircle size={24} className="text-orange-500" />, link: '/admin/orders', action: 'Review Pending' },
+        { name: 'Update Statuses', value: pendingCount, icon: <AlertCircle size={24} className="text-orange-500" />, link: '/admin/orders?action=import', action: 'Update Statuses' },
     ];
+
+    const visibleStats = stats.filter(item => !isRestrictedInfo || !item.restricted);
 
     return (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((item) => (
+            {visibleStats.map((item) => (
                 <Link key={item.name} to={item.link} className="block group">
                     <Card className="flex items-center p-4 transition-all duration-200 hover:shadow-md hover:ring-2 hover:ring-rose-500/20 cursor-pointer relative overflow-hidden">
                         <div className="flex-shrink-0 p-3 bg-gray-50 rounded-full group-hover:bg-white transition-colors">

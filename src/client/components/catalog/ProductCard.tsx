@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, ExternalLink } from 'lucide-react';
+import { Plus, ExternalLink, Pencil } from 'lucide-react';
 import { IProduct, IFormulas } from '../../../shared/types';
 import { calculateFrontlinePrice } from '../../utils/formulas';
 
@@ -7,10 +7,11 @@ interface ProductCardProps {
     product: IProduct;
     formulas: IFormulas | null;
     onAdd: (product: IProduct, pricing: any) => void;
+    onEdit?: (product: IProduct) => void;
     isDarkMode?: boolean;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onAdd, isDarkMode }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onAdd, onEdit, isDarkMode }) => {
     const calc = formulas ? calculateFrontlinePrice(product, formulas) : { frontlinePrice: '0.00' };
 
     return (
@@ -104,13 +105,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                     </div>
                 </div>
 
-                <button
-                    onClick={() => onAdd(product, calc)}
-                    className="w-full bg-[#1a1a1a] dark:bg-rose-600 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-rose-700 transition-all duration-300 flex items-center justify-center space-x-3 active:scale-[0.98] shadow-lg shadow-slate-200 dark:shadow-none"
-                >
-                    <Plus className="w-4 h-4" />
-                    <span>Submit Request</span>
-                </button>
+                <div className="flex space-x-2">
+                    <button
+                        onClick={() => onAdd(product, calc)}
+                        className="flex-1 bg-[#1a1a1a] dark:bg-rose-600 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 dark:hover:bg-rose-700 transition-all duration-300 flex items-center justify-center space-x-3 active:scale-[0.98] shadow-lg shadow-slate-200 dark:shadow-none"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Submit Request</span>
+                    </button>
+
+                    {onEdit && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEdit(product);
+                            }}
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 p-4 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-300 flex items-center justify-center active:scale-[0.98]"
+                            title="Edit Product"
+                        >
+                            <Pencil className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );

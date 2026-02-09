@@ -3,9 +3,11 @@ import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { TaxonomySidebar } from '../../components/catalog/TaxonomySidebar';
 import { ProductGrid } from '../../components/catalog/ProductGrid';
+import { ProductEditModal } from '../../components/catalog/ProductEditModal';
 import { LayoutGrid, List, CheckCircle, Download } from 'lucide-react';
 import { calculateFrontlinePrice } from '../../utils/formulas';
 import { exportProductsToExcel } from '../../utils/export';
+import { IProduct } from '../../../shared/types';
 
 export const CatalogPage: React.FC = () => {
     const { products, formulas, isLoading, error, fetchProducts, fetchFormulas, addSpecialOrder } = useProductStore();
@@ -17,6 +19,8 @@ export const CatalogPage: React.FC = () => {
     const [selectedSupplier, setSelectedSupplier] = useState('all');
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [editingProduct, setEditingProduct] = useState<IProduct | null>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     // Fetch Data on Mount
     useEffect(() => {
@@ -201,8 +205,38 @@ export const CatalogPage: React.FC = () => {
         exportProductsToExcel(filteredProducts, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
+    const handleEditProduct = (product: IProduct) => {
+        // Permission Check (Frontend optimization, authentic check is on backend)
+        if (user?.type !== 'admin') return;
+
+        // Vendor Check
+        if (user.vendors && user.vendors.length > 0) {
+            if (!product.supplier || !user.vendors.includes(product.supplier)) {
+                alert("You can only edit products from your assigned suppliers.");
+                return;
+            }
+        }
+
+        setEditingProduct(product);
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = () => {
+        fetchProducts(); // Refresh list
+        setSuccessMessage(`Product updated successfully.`);
+    };
+
     return (
         <div className="space-y-6 animate-fade-in-up">
+            {editingProduct && (
+                <ProductEditModal
+                    product={editingProduct}
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    onSave={handleSaveEdit}
+                />
+            )}
+
             <TaxonomySidebar
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
@@ -267,6 +301,7 @@ export const CatalogPage: React.FC = () => {
                 products={filteredProducts}
                 formulas={formulas}
                 onAdd={handleAddProduct}
+                onEdit={user?.type === 'admin' ? handleEditProduct : undefined}
                 viewMode={viewMode}
             />
         </div>

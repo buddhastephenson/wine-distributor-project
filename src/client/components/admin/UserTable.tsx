@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { IUser } from '../../../shared/types'; // Correct relative path
 import { Button } from '../shared/Button';
-import { Edit2, Lock, Unlock, Trash2, UserCheck } from 'lucide-react';
+import { Edit2, Lock, Unlock, Trash2, UserCheck, Search, Key } from 'lucide-react';
 import { userApi } from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -14,8 +14,17 @@ interface UserTableProps {
 export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpersonate }) => {
     const { user: currentUser } = useAuthStore();
     const [isLoading, setIsLoading] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const isSuperAdmin = currentUser?.isSuperAdmin || ['Trey', 'Matt Cory', 'treystephenson'].includes(currentUser?.username || '');
+
+    // Filter and Sort Users
+    const filteredUsers = users
+        .filter(user =>
+            user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            user.email.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        .sort((a, b) => a.username.localeCompare(b.username));
 
     const handleToggleAccess = async (user: IUser) => {
         setIsLoading(user.id);
@@ -69,17 +78,23 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
         }
     };
 
+    const [vendorInput, setVendorInput] = useState('');
+
     const handleManageVendors = (user: IUser) => {
         setSelectedUserForVendor(user);
-        setSelectedVendors(user.vendors || []);
+        setVendorInput((user.vendors || []).join(', '));
         setShowVendorModal(true);
     };
 
     const saveVendorAssignment = async () => {
         if (!selectedUserForVendor) return;
         setIsLoading(selectedUserForVendor.id);
+
+        // Parse input on save
+        const updatedVendors = vendorInput.split(',').map(s => s.trim()).filter(Boolean);
+
         try {
-            await userApi.updateRole(selectedUserForVendor.id, 'admin', selectedVendors);
+            await userApi.updateRole(selectedUserForVendor.id, 'admin', updatedVendors);
             setShowVendorModal(false);
             onRefresh();
         } catch (error) {
@@ -91,11 +106,10 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
 
     // Helper to toggle vendor selection
     const toggleVendor = (vendor: string) => {
-        if (selectedVendors.includes(vendor)) {
-            setSelectedVendors(selectedVendors.filter(v => v !== vendor));
-        } else {
-            setSelectedVendors([...selectedVendors, vendor]);
-        }
+        // Legacy or unused? The modal uses text input now.
+        // Keeping logic just in case but modifying to work with string input if needed? 
+        // Actually this was for checkboxes. Let's ignore or update if used.
+        // It's not used in current modal render.
     };
 
     // Quick Add Modal State
@@ -118,9 +132,47 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
         }
     };
 
+    // Password Reset Modal State
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [selectedUserForPassword, setSelectedUserForPassword] = useState<IUser | null>(null);
+    const [newPassword, setNewPassword] = useState('');
+
+    const handlePasswordResetClick = (user: IUser) => {
+        setSelectedUserForPassword(user);
+        setNewPassword('');
+        setShowPasswordModal(true);
+    };
+
+    const submitPasswordReset = async () => {
+        if (!selectedUserForPassword || !newPassword) return;
+        setIsLoading(selectedUserForPassword.id);
+        try {
+            await userApi.updatePassword(selectedUserForPassword.id, newPassword);
+            alert(`Password for ${selectedUserForPassword.username} has been updated.`);
+            setShowPasswordModal(false);
+        } catch (error) {
+            console.error('Failed to reset password', error);
+            alert('Failed to update password');
+        } finally {
+            setIsLoading(null);
+        }
+    };
+
     return (
         <div className="flex flex-col">
-            <div className="flex justify-end mb-4 px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 px-6 lg:px-8 gap-4">
+                <div className="relative w-full sm:w-64">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search size={18} className="text-gray-400" />
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search users..."
+                        className="pl-10 pr-4 py-2 border rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-rose-500"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
                 <Button onClick={() => setShowQuickAddModal(true)}>
                     + Add Customer
                 </Button>
@@ -161,11 +213,6 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                             <p className="text-sm text-gray-500 mb-4">Select vendors this user is allowed to manage.</p>
 
                             <div className="space-y-2 mb-6">
-                                {/* TODO: popuate this list dynamically. For now, let's fetch unique suppliers from somewhere or props */}
-                                {/* Assuming props.uniqueSuppliers exists or we fetch it. Let's add it to props later. */}
-                                {/* Fallback to text input for now? No, user wants easy selection. */}
-                                {/* Let's mock some common ones or use a text area for comma separated? */}
-                                {/* Better: A simple text area for entering vendor names exactly if list is too huge to fetch here easily without store refactor */}
                                 <div className="text-xs text-slate-500">
                                     Enter exact Supplier names from the catalog, separated by commas.
                                     <br />Example: <em>Rosenthal Wine Merchant, Bon Vivant Imports</em>
@@ -173,14 +220,37 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                 <textarea
                                     className="w-full border rounded p-2 text-sm"
                                     rows={4}
-                                    value={selectedVendors.join(', ')}
-                                    onChange={(e) => setSelectedVendors(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                                    value={vendorInput}
+                                    onChange={(e) => setVendorInput(e.target.value)}
                                 />
                             </div>
 
                             <div className="flex justify-end space-x-2">
                                 <Button variant="secondary" onClick={() => setShowVendorModal(false)}>Cancel</Button>
                                 <Button onClick={saveVendorAssignment}>Save</Button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Password Reset Modal */}
+            {
+                showPasswordModal && selectedUserForPassword && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                        <div className="bg-white p-6 rounded-lg w-96">
+                            <h3 className="text-lg font-bold mb-4">Reset Password for {selectedUserForPassword.username}</h3>
+                            <p className="text-sm text-gray-500 mb-4">Enter a new password for this user.</p>
+                            <input
+                                type="text"
+                                placeholder="New Password"
+                                className="w-full border rounded p-2 mb-4"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                            />
+                            <div className="flex justify-end space-x-2">
+                                <Button variant="secondary" onClick={() => setShowPasswordModal(false)}>Cancel</Button>
+                                <Button onClick={submitPasswordReset}>Update Password</Button>
                             </div>
                         </div>
                     </div>
@@ -208,7 +278,7 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {users.map((user) => (
+                                {filteredUsers.map((user) => (
                                     <tr key={user.id}>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-medium text-gray-900">{user.username}</div>
@@ -252,6 +322,14 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                                             Vendors
                                                         </button>
                                                     )}
+
+                                                    <button
+                                                        onClick={() => handlePasswordResetClick(user)}
+                                                        className="text-amber-600 hover:text-amber-900 mr-4"
+                                                        title="Reset Password"
+                                                    >
+                                                        <Key size={18} />
+                                                    </button>
 
                                                     <button
                                                         onClick={() => handleToggleAccess(user)}

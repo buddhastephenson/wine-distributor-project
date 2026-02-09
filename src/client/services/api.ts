@@ -23,8 +23,29 @@ api.interceptors.response.use(
     }
 );
 
+// Request interceptor to attach User ID (Simple Auth)
+api.interceptors.request.use((config) => {
+    // Dynamically import store to avoid circular dependencies if any, 
+    // or just access the global store we know exists.
+    // We need to require it or import it at top user if possible, but let's try lazy access if needed?
+    // Actually, importing useAuthStore at top level is fine in most cases.
+
+    // We need to import useAuthStore at the top of the file first to use it here.
+    // But wait, the file doesn't import it yet. I need to add the import.
+    const { useAuthStore } = require('../store/useAuthStore');
+    const user = useAuthStore.getState().user;
+
+    if (user && user.id) {
+        config.headers['x-user-id'] = user.id;
+    }
+    return config;
+}, (error) => {
+    return Promise.reject(error);
+});
+
 export const authApi = {
     login: (credentials: any) => api.post<IAuthResponse>('/auth/login', credentials),
+    verify: () => api.get<IAuthResponse>('/auth/verify'),
     signup: (data: any) => api.post<IAuthResponse>('/auth/signup', data),
     forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
     resetPassword: (data: any) => api.post('/auth/reset-password', data),
@@ -34,6 +55,7 @@ export const productApi = {
     getAll: () => api.get<IProduct[]>('/products'),
     update: (id: string, updates: Partial<IProduct>) => api.patch<{ success: boolean; product: IProduct }>(`/products/${id}`, updates),
     delete: (id: string) => api.delete<{ success: boolean }>(`/products/${id}`),
+    import: (products: any[], supplier: string) => api.post<{ success: boolean; stats: any }>('/products/import', { products, supplier }),
 };
 
 export const specialOrderApi = {
@@ -41,6 +63,7 @@ export const specialOrderApi = {
     create: (data: Partial<ISpecialOrder>) => api.post<{ success: boolean; order: ISpecialOrder }>('/special-orders', data),
     update: (id: string, updates: Partial<ISpecialOrder>) => api.patch<{ success: boolean; order: ISpecialOrder }>(`/special-orders/${id}`, updates),
     delete: (id: string) => api.delete<{ success: boolean }>(`/special-orders/${id}`),
+    batchUpdateStatus: (updates: { id: string, status: string }[]) => api.post<{ success: boolean }>('/special-orders/batch-status', updates),
 };
 
 export const userApi = {

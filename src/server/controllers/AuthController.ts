@@ -15,6 +15,20 @@ class AuthController {
         }
     }
 
+    async verify(req: Request, res: Response) {
+        try {
+            // req.user is attached by authenticate middleware
+            const user = req.user;
+            if (!user) {
+                return res.status(401).json({ success: false, error: 'Not Authenticated' });
+            }
+            console.log('Verify Endpoint User:', { username: user.username, vendors: user.vendors });
+            res.json({ success: true, user });
+        } catch (error) {
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+
     async quickCreate(req: Request, res: Response) {
         try {
             const { username } = req.body;
@@ -59,6 +73,27 @@ class AuthController {
             }
             res.json(result);
         } catch (error) {
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+
+    async updatePassword(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { password } = req.body;
+
+            // Basic validation
+            if (!password || password.length < 6) {
+                return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+            }
+
+            const result = await AuthService.updatePassword(id as string, password);
+            if (!result.success) {
+                return res.status(400).json(result);
+            }
+            res.json(result);
+        } catch (error) {
+            console.error('Update password error:', error);
             res.status(500).json({ error: 'Internal Server Error' });
         }
     }

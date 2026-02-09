@@ -26,12 +26,25 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                                         useAuthStore.getState().stopImpersonating();
                                         navigate('/admin');
                                     }}
-                                    className="text-sm font-medium text-red-600 hover:text-red-800 underline"
+                                    className="text-sm font-medium text-red-600 hover:text-red-800 underline mr-4"
                                 >
                                     Stop Impersonating
                                 </button>
                             )}
-                            <span className="text-sm font-medium text-gray-700">Admin User</span>
+                            <div className="flex items-center space-x-3">
+                                <span className="text-sm font-medium text-gray-700">
+                                    {useAuthStore.getState().user?.username || 'Admin User'}
+                                </span>
+                                <button
+                                    onClick={() => {
+                                        useAuthStore.getState().logout();
+                                        navigate('/login');
+                                    }}
+                                    className="text-sm font-medium text-gray-500 hover:text-gray-800"
+                                >
+                                    Logout
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </header>

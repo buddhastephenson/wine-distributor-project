@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { IProduct, ISpecialOrder, IFormulas } from '../../shared/types';
-import { productApi, specialOrderApi } from '../services/api';
+import { productApi, specialOrderApi, storageApi } from '../services/api';
 
 interface ProductState {
     products: IProduct[];
@@ -14,6 +14,7 @@ interface ProductState {
     addSpecialOrder: (order: Partial<ISpecialOrder>) => Promise<void>;
     updateSpecialOrder: (id: string, updates: Partial<ISpecialOrder>) => Promise<void>;
     deleteSpecialOrder: (id: string) => Promise<void>;
+    batchUpdateStatus: (updates: { id: string, status: string }[]) => Promise<void>;
     fetchFormulas: () => Promise<void>;
 
     // Optimistic updates could be added here
@@ -92,6 +93,24 @@ export const useProductStore = create<ProductState>((set, get) => ({
         }
     },
 
+    batchUpdateStatus: async (updates) => {
+        set({ isLoading: true });
+        try {
+            await specialOrderApi.batchUpdateStatus(updates);
+            // Manually update local state
+            set((state) => {
+                const newOrders = state.specialOrders.map(order => {
+                    const update = updates.find(u => u.id === order.id);
+                    return update ? { ...order, status: update.status } : order;
+                });
+                return { specialOrders: newOrders, isLoading: false };
+            });
+        } catch (error: any) {
+            set({ error: error.message || 'Failed to batch update', isLoading: false });
+            throw error;
+        }
+    },
+
     updateProduct: async (id, updates) => {
         // Optimistic update
         const prevProducts = get().products;
@@ -139,7 +158,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     updateFormulas: async (newFormulas: IFormulas) => {
         set({ formulas: newFormulas }); // Optimistic update
         try {
-            const response = await import('../services/api').then(m => m.storageApi.updateFormulas(newFormulas));
+            const response = await storageApi.updateFormulas(newFormulas);
             if (!response.data.success) throw new Error('Failed to save formulas');
         } catch (error) {
             console.error('Failed to save formulas:', error);

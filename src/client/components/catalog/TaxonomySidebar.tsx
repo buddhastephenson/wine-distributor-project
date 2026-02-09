@@ -116,7 +116,7 @@ export const TaxonomySidebar: React.FC<TaxonomySidebarProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 <div className="space-y-1.5 lg:col-span-1">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Distributor / Portfolio</label>
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Distributor Portfolios & Special Offers</label>
                     <div className="relative">
                         <select
                             value={selectedSupplier}

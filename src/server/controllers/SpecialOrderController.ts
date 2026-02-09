@@ -7,9 +7,12 @@ class SpecialOrderController {
             const { username } = req.query;
             let orders;
             if (username && typeof username === 'string') {
-                orders = await SpecialOrderService.getSpecialOrdersByUsername(username);
+                orders = await SpecialOrderService.getSpecialOrdersByUsername(username); // Username filter overrides? or ANDs? 
+                // Actually if a Vendor queries by username, they should still only see that user's orders FOR THAT VENDOR.
+                // So we should probably pass user to both.
+                orders = await SpecialOrderService.getSpecialOrdersByUsername(username, req.user);
             } else {
-                orders = await SpecialOrderService.getAllSpecialOrders();
+                orders = await SpecialOrderService.getAllSpecialOrders(req.user);
             }
             res.json(orders);
         } catch (error) {
@@ -36,6 +39,19 @@ class SpecialOrderController {
             res.json({ success: true, order });
         } catch (error) {
             res.status(500).json({ error: 'Failed to update order' });
+        }
+    }
+
+    async batchUpdateStatus(req: Request, res: Response) {
+        try {
+            const updates = req.body; // Expect array of { id, status }
+            if (!Array.isArray(updates)) {
+                return res.status(400).json({ error: 'Invalid data format' });
+            }
+            const result = await SpecialOrderService.batchUpdateStatus(updates);
+            res.json({ success: true, ...result });
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to batch update orders' });
         }
     }
 

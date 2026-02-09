@@ -1,5 +1,5 @@
 import React from 'react';
-import { ISpecialOrder, IUser } from '../../../shared/types';
+import { ISpecialOrder, IUser, ORDER_STATUS } from '../../../shared/types';
 import { X, Check } from 'lucide-react';
 import { OrderChat } from './OrderChat';
 import { v4 as uuidv4 } from 'uuid'; // You might need to install this or use a simple generator
@@ -111,15 +111,44 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                     />
 
                     <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${(item.status || 'Requested').toUpperCase().includes('REQUESTED') ? 'bg-slate-50 text-slate-400 border-slate-100' :
-                            (item.status || '').toUpperCase().includes('ORDERED') ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                (item.status || '').toUpperCase().includes('STOCK') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                    (item.status || '').toUpperCase().includes('BACKORDERED') ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                        (item.status || '').toUpperCase().includes('DELIVERED') ? 'bg-green-50 text-green-700 border-green-100' :
-                                            'bg-rose-50 text-rose-600 border-rose-100'
-                            }`}>
-                            {item.status || 'Requested'}
-                        </span>
+                        {currentUser?.type === 'admin' ? (
+                            <div className="relative">
+                                <select
+                                    value={item.status || ORDER_STATUS.PENDING}
+                                    onChange={(e) => onUpdate(item.id, { status: e.target.value })}
+                                    className={`appearance-none text-[10px] font-black uppercase tracking-widest px-3 py-1 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/20 ${(item.status || 'Pending').includes('Pending') ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                                        (item.status || '').includes('On Purchase Order') ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                            (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                    (item.status || '').includes('Delivered') ? 'bg-green-50 text-green-700 border-green-100' :
+                                                        (item.status || '').includes('Not Available') ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                            'bg-gray-50 text-gray-600 border-gray-100'
+                                        }`}
+                                >
+                                    {Object.values(ORDER_STATUS).map((status) => (
+                                        <option key={status} value={status}>
+                                            {status}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                                    <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20">
+                                        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        ) : (
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${(item.status || 'Pending').includes('Pending') ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                                (item.status || '').includes('On Purchase Order') ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                    (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                        (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                            (item.status || '').includes('Delivered') ? 'bg-green-50 text-green-700 border-green-100' :
+                                                (item.status || '').includes('Not Available') ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                    'bg-gray-50 text-gray-600 border-gray-100'
+                                }`}>
+                                {item.status || 'Pending'}
+                            </span>
+                        )}
 
                         {(item.adminNotes || (currentUser?.type === 'admin' && item.notes)) && (
                             <div className="text-[10px] text-slate-400 italic max-w-[50%] truncate">

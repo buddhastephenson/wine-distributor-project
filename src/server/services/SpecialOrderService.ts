@@ -1,13 +1,21 @@
 import SpecialOrder from '../models/SpecialOrder';
-import { ISpecialOrder } from '../../shared/types';
+import { ISpecialOrder, IUser } from '../../shared/types';
 
 class SpecialOrderService {
-    async getAllSpecialOrders(): Promise<ISpecialOrder[]> {
-        return await SpecialOrder.find({}, '-_id -__v -createdAt -updatedAt').lean();
+    async getAllSpecialOrders(user?: IUser): Promise<ISpecialOrder[]> {
+        let query: any = {};
+        if (user && user.type === 'admin' && user.vendors && user.vendors.length > 0) {
+            query.supplier = { $in: user.vendors };
+        }
+        return await SpecialOrder.find(query, '-_id -__v -createdAt -updatedAt').lean();
     }
 
-    async getSpecialOrdersByUsername(username: string): Promise<ISpecialOrder[]> {
-        return await SpecialOrder.find({ username }, '-_id -__v -createdAt -updatedAt').lean();
+    async getSpecialOrdersByUsername(username: string, user?: IUser): Promise<ISpecialOrder[]> {
+        let query: any = { username };
+        if (user && user.type === 'admin' && user.vendors && user.vendors.length > 0) {
+            query.supplier = { $in: user.vendors };
+        }
+        return await SpecialOrder.find(query, '-_id -__v -createdAt -updatedAt').lean();
     }
 
     async createSpecialOrder(orderData: Partial<ISpecialOrder>): Promise<ISpecialOrder> {
@@ -17,9 +25,20 @@ class SpecialOrderService {
         return newOrder.toObject();
     }
 
-    async updateSpecialOrder(id: string, updates: Partial<ISpecialOrder>): Promise<ISpecialOrder | null> {
-        const order = await SpecialOrder.findOneAndUpdate({ id }, updates, { new: true });
-        return order ? order.toObject() : null;
+    async updateSpecialOrder(id: string, updates: Partial<ISpecialOrder>) {
+        return await SpecialOrder.findOneAndUpdate({ id }, updates, { new: true });
+    }
+
+    async batchUpdateStatus(updates: { id: string, status: string }[]) {
+        const operations = updates.map(({ id, status }) => ({
+            updateOne: {
+                filter: { id },
+                update: { $set: { status } }
+            }
+        }));
+
+        if (operations.length === 0) return { modifiedCount: 0 };
+        return await SpecialOrder.bulkWrite(operations);
     }
 
     async deleteSpecialOrder(id: string): Promise<boolean> {

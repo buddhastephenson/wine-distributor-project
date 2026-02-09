@@ -184,7 +184,18 @@ class AuthService {
             throw error;
         }
     }
-}
+    async updatePassword(id: string, password: string) {
+        const user = await User.findOne({ id });
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
 
+        // The pre-save hook in the User model will handle password hashing
+        user.password = password;
+        await user.save();
+
+        return { success: true, message: 'Password updated successfully' };
+    }
+}
 
 export default new AuthService();

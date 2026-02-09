@@ -10,6 +10,7 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
             : order.adminNotes || order.notes || '';
 
         return {
+            'Order ID': order.id, // Needed for re-import
             'Customer': order.username || 'Unknown',
             'Vendor': order.supplier || '',
             'Producer': order.producer || '',
@@ -24,7 +25,8 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
             'Quantity (Cases)': order.cases || 0,
             'Quantity (Bottles)': order.bottles || 0,
             'Date Requested': new Date(order.createdAt || order.uploadDate || Date.now()).toLocaleDateString(),
-            'Chat/Notes': chatInfo
+            'Chat/Notes': chatInfo,
+            'Submitted': order.submitted ? 'Yes' : 'No'
         };
     });
 

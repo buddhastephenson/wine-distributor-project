@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, Package, Users, FileText, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, Users, FileText, Settings, LogOut, Upload } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 
@@ -15,6 +15,7 @@ export const Sidebar: React.FC = () => {
     const navItems = [
         { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/admin' },
         { name: 'Products', icon: <Package size={20} />, path: '/admin/products' },
+        ...(isSuperAdmin ? [{ name: 'Import', icon: <Upload size={20} />, path: '/admin/import' }] : []),
         ...(isSuperAdmin ? [{ name: 'Users', icon: <Users size={20} />, path: '/admin/users' }] : []),
         { name: 'Orders', icon: <FileText size={20} />, path: '/admin/orders' },
         ...(isSuperAdmin ? [{ name: 'Settings', icon: <Settings size={20} />, path: '/admin/settings' }] : []),
@@ -45,13 +46,7 @@ export const Sidebar: React.FC = () => {
                 </ul>
             </nav>
             <div className="p-4 border-t border-gray-800">
-                <button
-                    onClick={logout}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
-                >
-                    <LogOut size={18} className="mr-3" />
-                    Logout
-                </button>
+                {/* Logout moved to header */}
             </div>
         </div>
     );

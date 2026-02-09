@@ -37,6 +37,17 @@ export interface IProduct {
     formulaUsed?: string;
 }
 
+export const ORDER_STATUS = {
+    PENDING: 'Pending',
+    ON_PO: 'On Purchase Order',
+    BACKORDERED: 'Backordered',
+    NOT_AVAILABLE: 'Not Available',
+    IN_STOCK: 'Arrived/In Stock',
+    DELIVERED: 'Delivered',
+} as const;
+
+export type OrderStatus = typeof ORDER_STATUS[keyof typeof ORDER_STATUS];
+
 export interface ISpecialOrder {
     id: string;
     username: string;

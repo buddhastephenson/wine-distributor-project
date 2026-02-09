@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { OrderList } from '../../components/orders/OrderList';
-import { ClipboardList, CheckCircle, Download, Users, ChevronRight } from 'lucide-react';
+import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload } from 'lucide-react';
 import { exportOrdersToExcel } from '../../utils/export';
 
 export const OrdersPage: React.FC = () => {
@@ -86,7 +86,7 @@ export const OrdersPage: React.FC = () => {
 
     const handleSubmitRequest = async () => {
         for (const order of displayedPending) {
-            await updateSpecialOrder(order.id, { submitted: true, status: 'Requested' });
+            await updateSpecialOrder(order.id, { submitted: true, status: 'Pending' });
         }
         setSuccessMessage('Request Submitted!');
         window.scrollTo(0, 0);
@@ -131,13 +131,57 @@ export const OrdersPage: React.FC = () => {
                 </div>
 
                 {user?.type === 'admin' && (
-                    <button
-                        onClick={handleExport}
-                        className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"
-                    >
-                        <Download className="w-4 h-4" />
-                        <span>Export Excel</span>
-                    </button>
+                    <div className="flex space-x-2">
+                        <label className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm cursor-pointer">
+                            <Upload className="w-4 h-4" />
+                            <span>Import Statuses</span>
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+
+                                    try {
+                                        const { read, utils } = await import('xlsx');
+                                        const data = await file.arrayBuffer();
+                                        const workbook = read(data);
+                                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                                        const jsonData = utils.sheet_to_json(worksheet) as any[];
+
+                                        const updates = jsonData
+                                            .filter((row: any) => row['Order ID'] && row['Status'])
+                                            .map((row: any) => ({
+                                                id: row['Order ID'],
+                                                status: row['Status']
+                                            }));
+
+                                        if (updates.length === 0) {
+                                            alert('No valid rows found. Ensure "Order ID" and "Status" columns exist.');
+                                            return;
+                                        }
+
+                                        await useProductStore.getState().batchUpdateStatus(updates);
+                                        setSuccessMessage(`Successfully updated ${updates.length} orders.`);
+                                        // window.location.reload(); // Or just let state update
+                                    } catch (error) {
+                                        console.error('Import Error:', error);
+                                        alert('Failed to import statuses. Check console for details.');
+                                    }
+                                    // Reset input
+                                    e.target.value = '';
+                                }}
+                            />
+                        </label>
+                        <button
+                            onClick={handleExport}
+                            className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"
+                        >
+                            <Download className="w-4 h-4" />
+                            <span>Export Excel</span>
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -176,8 +220,8 @@ export const OrdersPage: React.FC = () => {
                                         key={customer}
                                         onClick={() => setSelectedCustomer(customer)}
                                         className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${selectedCustomer === customer
-                                                ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 font-bold'
-                                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                            ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 font-bold'
+                                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                                             }`}
                                     >
                                         <div className="flex items-center gap-2">
