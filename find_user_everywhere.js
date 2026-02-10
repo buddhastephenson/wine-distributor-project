@@ -31,7 +31,12 @@ async function findUserEverywhere(targetUsername) {
             const db = conn.connection.useDb(dbName);
             const collection = db.collection('users');
 
-            const user = await collection.findOne({ username: { $regex: new RegExp(`^${targetUsername}$`, 'i') } });
+            const user = await collection.findOne({
+                $or: [
+                    { username: { $regex: new RegExp(`^${targetUsername}$`, 'i') } },
+                    { email: { $regex: new RegExp(`^${targetUsername}$`, 'i') } }
+                ]
+            });
 
             if (user) {
                 console.log('✅ FOUND USER!');
