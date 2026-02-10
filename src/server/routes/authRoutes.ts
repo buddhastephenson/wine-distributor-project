@@ -7,8 +7,8 @@ const router = Router();
 router.post('/signup', AuthController.signup.bind(AuthController)); // Ensure context is bound if not using arrow functions in class, or just bind here
 router.post('/login', AuthController.login.bind(AuthController));
 router.get('/verify', authenticate, AuthController.verify.bind(AuthController));
-// TODO: Add forgotPassword and resetPassword to AuthController if not already there,
-// wait, I only added methods to AuthService, I need to add them to AuthController first!
+router.post('/forgot-password', (req, res) => AuthController.forgotPassword(req, res));
+router.post('/reset-password', (req, res) => AuthController.resetPassword(req, res));
 router.patch('/users/:id/password', authenticate, AuthController.updatePassword.bind(AuthController));
 
 

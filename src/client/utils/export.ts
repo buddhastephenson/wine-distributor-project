@@ -5,8 +5,12 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
     // Flatten data for export
     const data = orders.map(order => {
         // Extract latest chat info if available, or just count
+        // Extract full chat history
         const chatInfo = order.messages && order.messages.length > 0
-            ? `${order.messages.length} messages. Latest: ${order.messages[order.messages.length - 1].text} (${order.messages[order.messages.length - 1].sender})`
+            ? order.messages.map(msg => {
+                const date = new Date(msg.timestamp).toLocaleDateString();
+                return `[${date}] ${msg.sender}: ${msg.text}`;
+            }).join('\n')
             : order.adminNotes || order.notes || '';
 
         return {

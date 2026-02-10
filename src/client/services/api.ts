@@ -64,6 +64,7 @@ export const specialOrderApi = {
     create: (data: Partial<ISpecialOrder>) => api.post<{ success: boolean; order: ISpecialOrder }>('/special-orders', data),
     update: (id: string, updates: Partial<ISpecialOrder>) => api.patch<{ success: boolean; order: ISpecialOrder }>(`/special-orders/${id}`, updates),
     delete: (id: string) => api.delete<{ success: boolean }>(`/special-orders/${id}`),
+    bulkDelete: (ids: string[]) => api.delete<{ success: boolean; message: string }>('/special-orders/bulk', { data: { ids } }),
     batchUpdateStatus: (updates: { id: string, status: string }[]) => api.post<{ success: boolean }>('/special-orders/batch-status', updates),
 };
 

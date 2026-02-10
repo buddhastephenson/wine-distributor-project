@@ -1,4 +1,5 @@
 import User from '../models/User';
+import bcrypt from 'bcryptjs';
 import { IUser } from '../../shared/types';
 
 class UserService {
@@ -41,8 +42,8 @@ class UserService {
     }
 
     async updatePassword(id: string, password: string): Promise<IUser | null> {
-        // TODO: Hash password
-        return await User.findOneAndUpdate({ id }, { password }, { new: true });
+        const hashedPassword = await bcrypt.hash(password, 10);
+        return await User.findOneAndUpdate({ id }, { password: hashedPassword }, { new: true });
     }
 
     async deleteUser(id: string): Promise<boolean> {

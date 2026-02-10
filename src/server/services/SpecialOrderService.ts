@@ -46,6 +46,11 @@ class SpecialOrderService {
         return !!result;
     }
 
+    async deleteSpecialOrders(ids: string[]): Promise<boolean> {
+        const result = await SpecialOrder.deleteMany({ id: { $in: ids } });
+        return result.deletedCount > 0;
+    }
+
     // Legacy Bulk Import Logic
     async bulkUpsertSpecialOrders(data: Record<string, ISpecialOrder[]>): Promise<void> {
         // data is { "username": [orders...] }

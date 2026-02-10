@@ -1,6 +1,18 @@
 import bcrypt from 'bcryptjs';
+import nodemailer from 'nodemailer';
 import User from '../models/User';
 import { IUser, IAuthResponse } from '../../shared/types';
+
+// Configure transporter
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: false, // true for 465, false for other ports
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+});
 
 class AuthService {
     async signup(userData: Partial<IUser>): Promise<IAuthResponse> {
@@ -38,7 +50,7 @@ class AuthService {
                 email
             });
 
-            // Mock Email
+            // Mock Email - TODO: Switch to real email if desired
             console.log(`\n--- WELCOME EMAIL SIMULATION ---`);
             console.log(`To: ${email}`);
             console.log(`Subject: Welcome to AOC Special Orders!`);
@@ -76,7 +88,7 @@ class AuthService {
                 return { success: false, error: 'Invalid credentials' };
             }
 
-            const isMatch = await bcrypt.compare(password, user.password);
+            const isMatch = await bcrypt.compare(password, user.password || '');
             if (!isMatch) {
                 console.log(`Login Failed: Invalid password for "${username}"`);
                 return { success: false, error: 'Invalid credentials' };
@@ -119,11 +131,28 @@ class AuthService {
             user.resetTokenExpiry = expiry;
             await user.save();
 
-            const resetLink = `http://localhost:3000/?token=${token}`;
-            console.log(`\n--- PASSWORD RESET SIMULATION ---`);
-            console.log(`To: ${email}`);
-            console.log(`Link: ${resetLink}`);
-            console.log(`----------------------------------\n`);
+            const resetLink = `http://localhost:3000/reset-password?token=${token}`; // TODO: Make base URL configurable
+
+            const mailOptions = {
+                from: process.env.SMTP_FROM || '"AOC Wines" <noreply@aocwines.com>',
+                to: email,
+                subject: 'Password Reset Request',
+                text: `You requested a password reset. Please click the following link to reset your password: ${resetLink}\n\nIf you did not request this, please ignore this email.`,
+                html: `<p>You requested a password reset.</p><p>Please click the following link to reset your password: <a href="${resetLink}">${resetLink}</a></p><p>If you did not request this, please ignore this email.</p>`
+            };
+
+            try {
+                if (process.env.SMTP_USER) {
+                    await transporter.sendMail(mailOptions);
+                    console.log(`Password reset email sent to ${email}`);
+                } else {
+                    console.log('SMTP not configured. Mocking email send.');
+                    console.log(`Link: ${resetLink}`);
+                }
+            } catch (emailError) {
+                console.error('Failed to send email:', emailError);
+                // Don't fail the request, just log it. In prod, we might want to alert.
+            }
 
             return { success: true, message: 'If an account exists with this email, a reset link will be sent.' };
         } catch (error) {

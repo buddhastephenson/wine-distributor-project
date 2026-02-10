@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SignupPage } from './pages/auth/SignupPage';
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { AdminLayout } from './components/layouts/AdminLayout';
 import { CustomerLayout } from './components/layouts/CustomerLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -40,11 +42,7 @@ const RootRedirect: React.FC = () => {
 };
 
 const App: React.FC = () => {
-    const checkSession = useAuthStore(state => state.verifySession);
-
-    useEffect(() => {
-        checkSession();
-    }, [checkSession]);
+    // ... useEffect
 
     return (
         <BrowserRouter>
@@ -52,9 +50,14 @@ const App: React.FC = () => {
                 {/* Public Routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
-                <Route path="/forgot-password" element={<div>Forgot Password (TODO)</div>} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                 {/* Root Redirect */}
+                <Route path="/" element={<RootRedirect />} />
+
+                {/* ... Rest of routes */}
+
                 <Route path="/" element={<RootRedirect />} />
 
                 {/* Admin Routes */}

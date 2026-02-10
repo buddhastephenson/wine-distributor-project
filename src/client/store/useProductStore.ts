@@ -14,6 +14,7 @@ interface ProductState {
     addSpecialOrder: (order: Partial<ISpecialOrder>) => Promise<void>;
     updateSpecialOrder: (id: string, updates: Partial<ISpecialOrder>) => Promise<void>;
     deleteSpecialOrder: (id: string) => Promise<void>;
+    bulkDeleteSpecialOrders: (ids: string[]) => Promise<void>;
     batchUpdateStatus: (updates: { id: string, status: string }[]) => Promise<void>;
     fetchFormulas: () => Promise<void>;
 
@@ -91,6 +92,19 @@ export const useProductStore = create<ProductState>((set, get) => ({
             await specialOrderApi.delete(id);
         } catch (error) {
             set({ specialOrders: prevOrders, error: 'Failed to delete order' });
+        }
+    },
+
+    bulkDeleteSpecialOrders: async (ids) => {
+        const prevOrders = get().specialOrders;
+        set({
+            specialOrders: prevOrders.filter(o => !ids.includes(o.id))
+        });
+
+        try {
+            await specialOrderApi.bulkDelete(ids);
+        } catch (error) {
+            set({ specialOrders: prevOrders, error: 'Failed to bulk delete orders' });
         }
     },
 

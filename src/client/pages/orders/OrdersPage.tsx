@@ -3,13 +3,15 @@ import { useLocation } from 'react-router-dom';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { OrderList } from '../../components/orders/OrderList';
-import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload } from 'lucide-react';
+import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload, Trash2 } from 'lucide-react';
 import { exportOrdersToExcel } from '../../utils/export';
+import { ConfirmationModal } from '../../components/shared/ConfirmationModal';
 
 export const OrdersPage: React.FC = () => {
-    const { specialOrders, fetchSpecialOrders, updateSpecialOrder, deleteSpecialOrder, isLoading, error } = useProductStore();
+    const { specialOrders, fetchSpecialOrders, updateSpecialOrder, deleteSpecialOrder, bulkDeleteSpecialOrders, isLoading, error } = useProductStore();
     const { user } = useAuthStore();
     const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+    const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
 
     useEffect(() => {
         if (user?.type === 'admin') {
@@ -120,6 +122,17 @@ export const OrdersPage: React.FC = () => {
         // Assuming "all orders" means everything visible to admin.
         const ordersToExport = user?.type === 'admin' ? [...pendingOrders, ...submittedOrders] : [...displayedPending, ...displayedSubmitted];
         exportOrdersToExcel(ordersToExport, `AOC_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
+    const handleBulkDelete = () => {
+        setIsBulkDeleteModalOpen(true);
+    };
+
+    const confirmBulkDelete = async () => {
+        const idsToDelete = displayedPending.map(o => o.id);
+        await bulkDeleteSpecialOrders(idsToDelete);
+        setIsBulkDeleteModalOpen(false);
+        setSuccessMessage(`Deleted ${idsToDelete.length} orders.`);
     };
 
     if (isLoading && specialOrders.length === 0) {
@@ -284,6 +297,16 @@ export const OrdersPage: React.FC = () => {
                                     >
                                         <CheckCircle className="w-4 h-4" />
                                         <span>Submit Request</span>
+                                        <span>Submit Request</span>
+                                    </button>
+                                )}
+                                {user?.type === 'admin' && selectedCustomer && displayedPending.length > 0 && (
+                                    <button
+                                        onClick={handleBulkDelete}
+                                        className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-red-100 transition-colors shadow-sm flex items-center space-x-2 border border-red-200"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        <span>Delete All</span>
                                     </button>
                                 )}
                             </div>
@@ -320,6 +343,15 @@ export const OrdersPage: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div>
+            <ConfirmationModal
+                isOpen={isBulkDeleteModalOpen}
+                onClose={() => setIsBulkDeleteModalOpen(false)}
+                onConfirm={confirmBulkDelete}
+                title="Delete All Pending Requests?"
+                message={`Are you sure you want to delete all ${displayedPending.length} pending requests for ${selectedCustomer}? This action cannot be undone.`}
+                confirmLabel="Delete All"
+                variant="danger"
+            />
+        </div >
     );
 };

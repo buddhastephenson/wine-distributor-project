@@ -18,7 +18,7 @@ async function listUsers() {
         const users = await User.find({}, 'username type email isSuperAdmin');
         console.log('--- User Accounts ---');
         users.forEach(u => {
-            console.log(`Username: ${u.username} | Type: ${u.type} | SuperAdmin: ${u.isSuperAdmin || false} | Email: ${u.email}`);
+            console.log(`Username: ${u.username} | Type: ${u.type} | SuperAdmin: ${u.isSuperAdmin || false} | Email: ${u.email} | Revoked: ${u.accessRevoked || false}`);
         });
         console.log('---------------------');
 

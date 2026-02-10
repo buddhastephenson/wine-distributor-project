@@ -18,6 +18,9 @@ router.post('/batch-status', authenticate, SpecialOrderController.batchUpdateSta
 
 router.patch('/:id', authenticate, SpecialOrderController.updateSpecialOrder.bind(SpecialOrderController));
 
+// DELETE /api/special-orders/bulk
+router.delete('/bulk', SpecialOrderController.bulkDeleteSpecialOrders.bind(SpecialOrderController));
+
 // DELETE /api/special-orders/:id
 router.delete('/:id', SpecialOrderController.deleteSpecialOrder.bind(SpecialOrderController));
 

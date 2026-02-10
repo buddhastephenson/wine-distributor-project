@@ -75,6 +75,21 @@ class SpecialOrderController {
             res.status(500).json({ error: 'Failed to delete order' });
         }
     }
+
+    async bulkDeleteSpecialOrders(req: Request, res: Response) {
+        try {
+            const { ids } = req.body;
+            if (!Array.isArray(ids) || ids.length === 0) {
+                return res.status(400).json({ error: 'Invalid or empty IDs array' });
+            }
+
+            const success = await SpecialOrderService.deleteSpecialOrders(ids);
+            res.json({ success, message: `Deleted ${ids.length} orders` });
+        } catch (error) {
+            console.error('Bulk Delete Error:', error);
+            res.status(500).json({ error: 'Failed to bulk delete orders' });
+        }
+    }
 }
 
 export default new SpecialOrderController();
