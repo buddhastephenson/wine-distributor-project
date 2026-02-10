@@ -35,7 +35,7 @@ const assignVendorRole = async () => {
         }
 
         if (user) {
-            user.type = 'admin';
+            user.type = 'vendor';
             user.vendors = ['Rosenthal Wine Merchant'];
             // Also ensure isSuperAdmin is false
             user.isSuperAdmin = false;
