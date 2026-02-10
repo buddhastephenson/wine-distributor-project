@@ -160,6 +160,22 @@ class ProductService {
             supplier
         };
     }
+
+    async bulkUpsertProducts(products: IProduct[]): Promise<void> {
+        if (!Array.isArray(products)) return;
+
+        const operations = products.map(p => ({
+            updateOne: {
+                filter: { id: p.id },
+                update: { $set: p },
+                upsert: true
+            }
+        }));
+
+        if (operations.length > 0) {
+            await Product.bulkWrite(operations);
+        }
+    }
 }
 
 export default new ProductService();

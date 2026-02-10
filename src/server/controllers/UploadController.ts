@@ -10,12 +10,13 @@ class UploadController {
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const inputPath = req.file.path;
+        const file = req.file;
+        const inputPath = file.path;
         const outputPath = `${inputPath}.xlsx`;
         // Assuming running from root of project
         const scriptPath = path.join(process.cwd(), 'converters', 'convert_louis_dressner_pdf.py');
 
-        console.log(`Processing PDF: ${req.file?.originalname}`);
+        console.log(`Processing PDF: ${file.originalname}`);
 
         exec(`python3 "${scriptPath}" "${inputPath}" "${outputPath}"`, (error, stdout, stderr) => {
             if (error) {
@@ -41,7 +42,7 @@ class UploadController {
                 res.json({
                     success: true,
                     data: jsonData,
-                    filename: req.file.originalname
+                    filename: file.originalname
                 });
             } catch (readError) {
                 console.error(`Read error: ${readError}`);
