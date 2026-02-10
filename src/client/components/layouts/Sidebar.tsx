@@ -11,20 +11,34 @@ export const Sidebar: React.FC = () => {
     if (!isSidebarOpen) return null;
 
     const isSuperAdmin = user?.isSuperAdmin || ['Trey', 'Matt Cory', 'treystephenson'].includes(user?.username || '');
+    const isVendor = user?.type === 'vendor';
 
     const navItems = [
-        { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/admin' },
-        { name: 'Products', icon: <Package size={20} />, path: '/admin/products' },
-        ...(isSuperAdmin ? [{ name: 'Import', icon: <Upload size={20} />, path: '/admin/import' }] : []),
-        ...(isSuperAdmin ? [{ name: 'Users', icon: <Users size={20} />, path: '/admin/users' }] : []),
-        { name: 'Orders', icon: <FileText size={20} />, path: '/admin/orders' },
-        ...(isSuperAdmin ? [{ name: 'Settings', icon: <Settings size={20} />, path: '/admin/settings' }] : []),
+        // Dashboard: Admin gets /admin, Vendor gets /vendor
+        { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: isVendor ? '/vendor' : '/admin' },
+
+        // Products: Admin gets /admin/products, Vendor gets /vendor/products
+        { name: 'Products', icon: <Package size={20} />, path: isVendor ? '/vendor/products' : '/admin/products' },
+
+        // Import: Admin (Super) or Vendor
+        ...((isSuperAdmin || isVendor) ? [{ name: 'Import', icon: <Upload size={20} />, path: isVendor ? '/vendor/upload' : '/admin/import' }] : []),
+
+        // Users: Super Admin only
+        ...(isSuperAdmin && !isVendor ? [{ name: 'Users', icon: <Users size={20} />, path: '/admin/users' }] : []),
+
+        // Orders: Admin only (for now, unless vendors fulfill their own)
+        ...(!isVendor ? [{ name: 'Orders', icon: <FileText size={20} />, path: '/admin/orders' }] : []),
+
+        // Settings: Super Admin only
+        ...(isSuperAdmin && !isVendor ? [{ name: 'Settings', icon: <Settings size={20} />, path: '/admin/settings' }] : []),
     ];
 
     return (
         <div className="flex flex-col w-64 bg-gray-900 h-screen text-white transition-all duration-300">
             <div className="flex items-center justify-center h-16 border-b border-gray-800">
-                <Link to="/admin" className="text-xl font-bold hover:text-indigo-400 transition-colors">AOC Admin</Link>
+                <Link to={user?.type === 'vendor' ? '/vendor' : '/admin'} className="text-xl font-bold hover:text-indigo-400 transition-colors">
+                    {user?.type === 'vendor' ? 'Vendor Portal' : 'AOC Admin'}
+                </Link>
             </div>
             <nav className="flex-1 overflow-y-auto py-4">
                 <ul className="space-y-1">

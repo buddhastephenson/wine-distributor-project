@@ -161,17 +161,10 @@ class ProductController {
         } else if (user?.type === 'vendor') {
             finalVendorId = user.id;
 
-            // If the vendor has specific allowed portfolios, enforce them
-            if (user.vendors && user.vendors.length > 0) {
-                if (!supplier || !user.vendors.includes(supplier)) {
-                    return res.status(403).json({ error: `Unauthorized: You are not authorized to import for ${supplier || 'unknown'}.` });
-                }
-            } else {
-                // If they don't have a list, default to their username if no supplier provided
-                // Or if they provided one, treat it as a new portfolio name they are creating?
-                // Let's allow them to specify, or default to their name.
-                if (!supplier) finalSupplier = user.username;
-            }
+            // Allow vendor to specify ANY supplier/portfolio name. 
+            // If they provided one, use it. If not, default to username.
+            if (!supplier) finalSupplier = user.username;
+
         } else {
             if (!supplier) {
                 return res.status(400).json({ error: 'Supplier is required for bulk import' });

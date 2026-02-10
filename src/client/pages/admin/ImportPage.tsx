@@ -209,7 +209,7 @@ export const ImportPage: React.FC = () => {
             setSelectedSupplier(user.vendors[0]);
         } else {
             // For Super Admins or Multi-Vendor users, ensure we reset so they must choose
-            if (user?.type !== 'vendor') setSelectedSupplier('');
+            if ((user?.type as string) !== 'vendor') setSelectedSupplier('');
         }
 
         setStep(3);
@@ -226,7 +226,11 @@ export const ImportPage: React.FC = () => {
 
         // Logic to validate supplier against vendor permissions
         const user = useAuthStore.getState().user;
-        if (user?.type === 'vendor' && user.vendors && user.vendors.length > 0) {
+        if (user?.type === 'vendor') {
+            // Vendors can create/manage any portfolio name they want. 
+            // We no longer restrict them to the hardcoded 'vendors' list for IMPORTING.
+        } else if (user?.type === 'admin' && user.vendors && user.vendors.length > 0) {
+            // Restricted Admins must still match
             if (!user.vendors.includes(finalSupplier)) {
                 setError(`You are not authorized to import products for "${finalSupplier}".`);
                 return;
@@ -503,8 +507,8 @@ export const ImportPage: React.FC = () => {
                                         )}
 
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Select Supplier / Portfolio
-                                            <span className="text-xs text-slate-400 font-normal ml-2">(Represents the Price List Name)</span>
+                                            Select Name of Price List or Offer
+                                            <span className="text-xs text-slate-400 font-normal ml-2">(e.g., "Spring 2024 Portfolio")</span>
                                         </label>
 
                                         {!isNewSupplier ? (
@@ -521,35 +525,27 @@ export const ImportPage: React.FC = () => {
                                                 // Disable if user is restricted to fewer than 2 choices (and 1 is auto-selected)
                                                 disabled={(() => {
                                                     if (user?.type === 'admin' && user?.vendors && user.vendors.length > 0) {
-                                                        // If restricted, and they have <= 1 vendor (which should be auto-selected), disable
                                                         return user.vendors.length <= 1;
                                                     }
                                                     return false;
                                                 })()}
                                                 className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <option value="">-- Select Existing Supplier --</option>
+                                                <option value="">-- Select Existing Price List --</option>
                                                 {/* Filter suppliers based on auth */}
                                                 {suppliers.filter(s => {
                                                     // Admin restricted
                                                     if (user?.type === 'admin' && user?.vendors && user.vendors.length > 0) {
                                                         return user.vendors.includes(s);
                                                     }
-                                                    // Vendor restricted
-                                                    if (user?.type === 'vendor' && user?.vendors && user.vendors.length > 0) {
-                                                        return user.vendors.includes(s);
-                                                    }
+                                                    // Vendor restricted - actually, let them see all their OWN portfolios
+                                                    // If we rely on 'suppliers' state which comes from products, it should only contain their products anyway.
                                                     return true;
                                                 }).map(s => <option key={s} value={s}>{s}</option>)}
 
-                                                {/* Only show Add New if logic permits? Actually backend blocks import for unknown suppliers if restricted.
-                                                    But user might want to CREATE a new list for their vendor name if it doesn't exist in products yet??
-                                                    If I am "Dalla Terra" and no products exist, `suppliers` list is empty.
-                                                    I need to be able to select "Dalla Terra" or type it?
-                                                    If I am restricted, I should arguably ONLY see my name.
-                                                */}
-                                                {(!user?.vendors?.length) && (
-                                                    <option value="___NEW___" className="font-bold text-indigo-600">+ Add New Supplier / Portfolio</option>
+                                                {/* Always allow Vendors to add new, or Admins if not restricted */}
+                                                {(user?.type === 'vendor' || (!user?.vendors?.length)) && (
+                                                    <option value="___NEW___" className="font-bold text-indigo-600">+ Create New Price List Name</option>
                                                 )}
                                             </select>
                                         ) : (
@@ -558,7 +554,7 @@ export const ImportPage: React.FC = () => {
                                                     type="text"
                                                     value={newSupplierName}
                                                     onChange={(e) => setNewSupplierName(e.target.value)}
-                                                    placeholder="Enter New Supplier / Portfolio Name"
+                                                    placeholder="Enter Price List Name"
                                                     className="flex-1 rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
                                                     autoFocus
                                                 />
@@ -573,8 +569,7 @@ export const ImportPage: React.FC = () => {
 
                                         <p className="text-xs text-orange-600 mt-2 flex items-start">
                                             <AlertCircle size={12} className="mr-1 mt-0.5" />
-                                            Warning: Importing will replace the entire catalog for this supplier,
-                                            excluding products on active requests.
+                                            Warning: Importing will replace the entire catalog for this price list.
                                         </p>
                                     </div>
 

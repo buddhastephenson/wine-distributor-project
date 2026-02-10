@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNavigate, Link, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Upload, LogOut, User } from 'lucide-react';
+import { Sidebar } from './Sidebar';
 
 interface VendorLayoutProps {
     children: React.ReactNode;
@@ -12,47 +12,38 @@ export const VendorLayout: React.FC<VendorLayoutProps> = ({ children }) => {
     const { user, logout } = useAuthStore();
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-slate-900">
-            {/* Sidebar */}
-            <aside className="w-64 bg-white dark:bg-slate-800 shadow-lg flex flex-col">
-                <div className="p-6 border-b border-gray-100 dark:border-slate-700">
-                    <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Vendor Portal</h1>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Manage Your Portfolio</p>
-                </div>
-
-                <nav className="flex-1 p-4 space-y-2">
-                    <Link to="/vendor" className="flex items-center space-x-3 px-4 py-3 text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">
-                        <LayoutDashboard size={20} />
-                        <span className="font-medium">Dashboard</span>
-                    </Link>
-                    <Link to="/vendor/upload" className="flex items-center space-x-3 px-4 py-3 text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors">
-                        <Upload size={20} />
-                        <span className="font-medium">Upload Portfolio</span>
-                    </Link>
-                </nav>
-
-                <div className="p-4 border-t border-gray-100 dark:border-slate-700">
-                    <div className="flex items-center space-x-3 px-4 py-3 text-gray-700 dark:text-gray-300">
-                        <User size={20} />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{user?.username}</p>
-                            <p className="text-xs text-gray-500 truncate">Vendor Access</p>
+        <div className="flex h-screen bg-gray-100">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <header className="bg-white shadow">
+                    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                        <Link to="/vendor">
+                            <h1 className="text-2xl font-bold text-gray-900 hover:text-indigo-600 transition-colors cursor-pointer">Vendor Dashboard</h1>
+                        </Link>
+                        <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-3">
+                                <span className="text-sm font-medium text-gray-700">
+                                    {user?.username || 'Vendor'}
+                                </span>
+                                <button
+                                    onClick={() => {
+                                        logout();
+                                        navigate('/login');
+                                    }}
+                                    className="text-sm font-medium text-gray-500 hover:text-gray-800"
+                                >
+                                    Logout
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <button
-                        onClick={() => { logout(); navigate('/login'); }}
-                        className="flex items-center space-x-3 px-4 py-3 w-full text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors mt-2"
-                    >
-                        <LogOut size={20} />
-                        <span className="font-medium">Sign Out</span>
-                    </button>
-                </div>
-            </aside>
-
-            {/* Main Content */}
-            <main className="flex-1 overflow-y-auto p-8">
-                <Outlet />
-            </main>
+                </header>
+                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">
+                    <div className="container mx-auto px-6 py-8">
+                        {children}
+                    </div>
+                </main>
+            </div>
         </div>
     );
 };
