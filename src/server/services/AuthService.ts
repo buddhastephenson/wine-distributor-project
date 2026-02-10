@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import User from '../models/User';
 import { IUser, IAuthResponse } from '../../shared/types';
 
@@ -27,10 +28,12 @@ class AuthService {
                 return { success: false, error: 'User or Email already exists' };
             }
 
+            const hashedPassword = await bcrypt.hash(password, 10);
+
             const newUser = await User.create({
                 id: `user-${Date.now()}`,
                 username,
-                password, // TODO: Hash password
+                password: hashedPassword,
                 type: 'customer',
                 email
             });
@@ -65,12 +68,17 @@ class AuthService {
 
         try {
             const user = await User.findOne({
-                username: { $regex: new RegExp(`^${username}$`, 'i') },
-                password // TODO: Hash check
+                username: { $regex: new RegExp(`^${username}$`, 'i') }
             });
 
             if (!user) {
-                console.log(`Login Failed: Invalid credentials for user "${username}"`);
+                console.log(`Login Failed: User not found "${username}"`);
+                return { success: false, error: 'Invalid credentials' };
+            }
+
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                console.log(`Login Failed: Invalid password for "${username}"`);
                 return { success: false, error: 'Invalid credentials' };
             }
 
@@ -85,7 +93,8 @@ class AuthService {
                     username: user.username,
                     type: user.type as 'admin' | 'customer',
                     email: user.email,
-                    isSuperAdmin: !!user.isSuperAdmin
+                    isSuperAdmin: !!user.isSuperAdmin,
+                    vendors: user.vendors
                 }
             };
         } catch (error) {
@@ -133,7 +142,8 @@ class AuthService {
                 return { success: false, error: 'Invalid or expired reset token' };
             }
 
-            user.password = password;
+            const hashedPassword = await bcrypt.hash(password, 10);
+            user.password = hashedPassword;
             user.resetToken = undefined;
             user.resetTokenExpiry = undefined;
             await user.save();
@@ -162,10 +172,13 @@ class AuthService {
             const sanitizedUsername = username.replace(/[^a-zA-Z0-9]/g, '');
             const dummyEmail = `${sanitizedUsername}-${Date.now()}@placeholder.local`;
 
+            // Hash the username as password for quick create
+            const hashedPassword = await bcrypt.hash(username, 10);
+
             const newUser = await User.create({
                 id: `user-${Date.now()}`,
                 username,
-                password: username, // TODO: Hash password if we were doing hashing
+                password: hashedPassword,
                 type: 'customer',
                 email: dummyEmail
             });
@@ -184,14 +197,15 @@ class AuthService {
             throw error;
         }
     }
+
     async updatePassword(id: string, password: string) {
         const user = await User.findOne({ id });
         if (!user) {
             return { success: false, error: 'User not found' };
         }
 
-        // The pre-save hook in the User model will handle password hashing
-        user.password = password;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        user.password = hashedPassword;
         await user.save();
 
         return { success: true, message: 'Password updated successfully' };

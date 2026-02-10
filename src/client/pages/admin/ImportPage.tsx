@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { Upload, FileText, CheckCircle, AlertCircle, Save, X, Download, ArrowRight, RefreshCw } from 'lucide-react';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { productApi } from '../../services/api';
+import { productApi, userApi } from '../../services/api';
 
 const SYSTEM_FIELDS = [
     { key: 'itemCode', label: 'Item Code', required: true, aliases: ['Item Code', 'ItemCode', 'Code', 'SKU', 'Item'] },
@@ -19,6 +19,8 @@ const SYSTEM_FIELDS = [
     { key: 'country', label: 'Country', required: false, aliases: ['Country'] },
     { key: 'region', label: 'Region', required: false, aliases: ['Region'] },
     { key: 'appellation', label: 'Appellation', required: false, aliases: ['Appellation'] },
+    { key: 'grapeVariety', label: 'Grape Variety', required: false, aliases: ['Grape', 'Variety', 'Varietal', 'Grapes'] },
+    { key: 'productLink', label: 'Product Link', required: false, aliases: ['Product Link', 'Website', 'Site', 'URL', 'Link'] },
 ];
 
 export const ImportPage: React.FC = () => {
@@ -28,6 +30,7 @@ export const ImportPage: React.FC = () => {
     const [file, setFile] = useState<File | null>(null);
     const [rawFileDetails, setRawFileDetails] = useState<{ headers: string[], data: any[] } | null>(null);
     const [columnMapping, setColumnMapping] = useState<Record<string, string>>({}); // System Key -> File Header
+    const [selectedExtraColumns, setSelectedExtraColumns] = useState<string[]>([]); // Headers to import as extended data
 
     const [previewData, setPreviewData] = useState<any[]>([]);
     const [suppliers, setSuppliers] = useState<string[]>([]);
@@ -38,9 +41,31 @@ export const ImportPage: React.FC = () => {
     const [uploadStats, setUploadStats] = useState<{ added: number, updated: number, deleted: number, kept: number } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Fetch products on mount to get existing suppliers
+    const [vendors, setVendors] = useState<any[]>([]);
+    const [selectedVendor, setSelectedVendor] = useState<string>('');
+    const [isNewVendor, setIsNewVendor] = useState(false);
+    const [newVendorName, setNewVendorName] = useState('');
+
+    // Fetch products and users (vendors) on mount
     useEffect(() => {
         fetchProducts();
+
+        // Fetch users to find potential vendors
+        // Assuming we can access userApi here or just fetch users
+        const fetchVendors = async () => {
+            try {
+                const response = await userApi.getAll();
+                const admins = response.data
+                    .filter(u => u.type === 'admin' && u.vendors && u.vendors.length > 0)
+                    .sort((a, b) => a.username.localeCompare(b.username));
+                setVendors(admins);
+            } catch (err) {
+                console.error('Failed to fetch vendors:', err);
+            }
+        };
+        fetchVendors();
+        // Actually, let's just do it in the next edit to be safe with imports.
+        // For now, let's initialize the state.
     }, []);
 
     const handleDownloadTemplate = () => {
@@ -128,6 +153,15 @@ export const ImportPage: React.FC = () => {
             country: String(row[columnMapping['country']] || '').trim(),
             region: String(row[columnMapping['region']] || '').trim(),
             appellation: String(row[columnMapping['appellation']] || '').trim(),
+            grapeVariety: String(row[columnMapping['grapeVariety']] || '').trim(),
+            productLink: String(row[columnMapping['productLink']] || '').trim(),
+            extendedData: selectedExtraColumns.reduce((acc, col) => {
+                const val = row[col];
+                if (val !== undefined && val !== null && String(val).trim() !== '') {
+                    acc[col] = val;
+                }
+                return acc;
+            }, {} as Record<string, any>)
         })).filter(p => p.itemCode && p.productName);
 
         if (mappedProducts.length === 0) {
@@ -202,7 +236,7 @@ export const ImportPage: React.FC = () => {
 
         try {
             // Use authenticated API service
-            const response = await productApi.import(productsToImport, finalSupplier);
+            const response = await productApi.import(productsToImport, finalSupplier, selectedVendor, isNewVendor ? newVendorName : undefined);
 
             setUploadStats(response.data.stats);
             // Don't reset everything, show stats
@@ -319,6 +353,34 @@ export const ImportPage: React.FC = () => {
                                 ))}
                             </div>
 
+                            <div className="mt-8 border-t border-slate-100 dark:border-slate-700 pt-6">
+                                <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider mb-4">
+                                    Additional Data Columns (Optional)
+                                </h3>
+                                <p className="text-xs text-slate-500 mb-4">
+                                    Select any other columns you want to import. These will be displayed as extra details on the product card.
+                                </p>
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {rawFileDetails.headers.filter(h => !Object.values(columnMapping).includes(h)).map(header => (
+                                        <label key={header} className="flex items-center space-x-2 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedExtraColumns.includes(header)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedExtraColumns(prev => [...prev, header]);
+                                                    } else {
+                                                        setSelectedExtraColumns(prev => prev.filter(h => h !== header));
+                                                    }
+                                                }}
+                                                className="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                                            />
+                                            <span className="text-sm text-slate-700 dark:text-slate-300 truncate" title={header}>{header}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="mt-8 flex justify-end">
                                 <button
                                     onClick={handleMappingConfirm}
@@ -358,6 +420,53 @@ export const ImportPage: React.FC = () => {
                                     </div>
 
                                     <div>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Select Vendor (User)
+                                            <span className="text-xs text-slate-400 font-normal ml-2">(Who manages this portfolio?)</span>
+                                        </label>
+
+                                        {!isNewVendor ? (
+                                            <div className="mb-6">
+                                                <select
+                                                    value={selectedVendor}
+                                                    onChange={(e) => {
+                                                        if (e.target.value === '___NEW___') {
+                                                            setIsNewVendor(true);
+                                                            setSelectedVendor('');
+                                                        } else {
+                                                            setSelectedVendor(e.target.value);
+                                                        }
+                                                    }}
+                                                    className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
+                                                >
+                                                    <option value="">-- Select Vendor --</option>
+                                                    {vendors.map(v => (
+                                                        <option key={v.id} value={v.id}>
+                                                            {v.username}
+                                                        </option>
+                                                    ))}
+                                                    <option value="___NEW___" className="font-bold text-indigo-600">+ Create New Vendor User</option>
+                                                </select>
+                                            </div>
+                                        ) : (
+                                            <div className="flex space-x-2 mb-6">
+                                                <input
+                                                    type="text"
+                                                    value={newVendorName}
+                                                    onChange={(e) => setNewVendorName(e.target.value)}
+                                                    placeholder="Enter New Vendor Username"
+                                                    className="flex-1 rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    onClick={() => { setIsNewVendor(false); setNewVendorName(''); }}
+                                                    className="text-slate-500 hover:text-slate-700 px-3 py-2 border rounded-lg"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        )}
+
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                                             Select Supplier / Portfolio
                                             <span className="text-xs text-slate-400 font-normal ml-2">(Represents the Price List Name)</span>
@@ -439,9 +548,9 @@ export const ImportPage: React.FC = () => {
                                         </button>
                                         <button
                                             onClick={handleImport}
-                                            disabled={isUploading || (!selectedSupplier && !newSupplierName)}
+                                            disabled={isUploading || (!selectedSupplier && !newSupplierName) || (!selectedVendor && !newVendorName)}
                                             className={`py-2 px-6 rounded-xl flex items-center justify-center space-x-2 font-bold text-white transition-all shadow-md
-                                                ${isUploading || (!selectedSupplier && !newSupplierName) ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}
+                                                ${isUploading || (!selectedSupplier && !newSupplierName) || (!selectedVendor && !newVendorName) ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}
                                             `}
                                         >
                                             {isUploading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <span>Start Import</span>}

@@ -10,6 +10,7 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
             : order.adminNotes || order.notes || '';
 
         return {
+            'Item Code': order.itemCode || '',
             'Order ID': order.id, // Needed for re-import
             'Customer': order.username || 'Unknown',
             'Vendor': order.supplier || '',
@@ -19,7 +20,7 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
             'Bottle Size': order.bottleSize || '',
             'Case Pack': order.packSize || '',
             'FOB Case': order.fobCasePrice || '',
-            'Frontline Case': order.frontlinePrice || '',
+            'Frontline Case': (parseFloat(order.frontlinePrice || '0') * parseInt(order.packSize || '12')).toFixed(2),
             'Wholesale Bottle': order.whlsBottle || '',
             'Status': order.status || 'Pending',
             'Quantity (Cases)': order.cases || 0,
@@ -50,6 +51,7 @@ export const exportProductsToExcel = (products: any[], filename: string = 'produ
         'Supplier': product.supplier || '',
         'Type': product.productType || '',
         'FOB Case': product.fobCasePrice || 0,
+        'Frontline Case': (parseFloat(product.frontlinePrice || '0') * parseInt(product.packSize || '12')).toFixed(2),
         'Laid In': product.laidInCost || 0,
         'Wholesale Case': product.wholesalePrice || 0,
         'Status': product.status || 'Active'

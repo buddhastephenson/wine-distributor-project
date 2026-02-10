@@ -12,6 +12,38 @@ class ProductController {
         }
     }
 
+    async createProduct(req: Request, res: Response) {
+        const productData = req.body;
+        const user = req.user;
+
+        try {
+            // Permission Check
+            if (user?.type === 'admin' && user.vendors && user.vendors.length > 0) {
+                if (!productData.supplier) {
+                    return res.status(400).json({ error: 'Supplier is required.' });
+                }
+                if (!user.vendors.includes(productData.supplier)) {
+                    return res.status(403).json({ error: 'Unauthorized: You can only create products for your assigned suppliers.' });
+                }
+            }
+
+            // Basic Validation
+            if (!productData.productName || !productData.itemCode) {
+                return res.status(400).json({ error: 'Product Name and Item Code are required.' });
+            }
+
+            const newProduct = await ProductService.createProduct(productData);
+            res.status(201).json({ success: true, product: newProduct });
+        } catch (error: any) {
+            console.error('Error creating product:', error);
+            // Check for duplicate key error (11000)
+            if (error.code === 11000) {
+                return res.status(400).json({ error: 'Product with this Item Code/ID already exists.' });
+            }
+            res.status(500).json({ error: 'Failed to create product' });
+        }
+    }
+
     async updateProduct(req: Request, res: Response) {
         const { id } = req.params;
         const updates = req.body;

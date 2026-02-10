@@ -5,13 +5,15 @@ import { X, Save, AlertCircle } from 'lucide-react';
 import { productApi } from '../../services/api';
 
 interface ProductEditModalProps {
-    product: IProduct;
+    product?: IProduct | null;
     isOpen: boolean;
     onClose: () => void;
     onSave: () => void;
+    suppliers?: string[];
 }
 
-export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isOpen, onClose, onSave }) => {
+export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isOpen, onClose, onSave, suppliers = [] }) => {
+
     const [formData, setFormData] = useState<Partial<IProduct>>({});
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -20,6 +22,8 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
         if (product) {
             setFormData({
                 productName: product.productName,
+                itemCode: product.itemCode,
+                supplier: product.supplier,
                 vintage: product.vintage,
                 producer: product.producer,
                 bottleSize: product.bottleSize,
@@ -31,8 +35,15 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
                 appellation: product.appellation,
                 productLink: product.productLink
             });
+        } else {
+            // Reset for new product
+            setFormData({
+                productType: 'wine',
+                bottleSize: '750ml',
+                packSize: '12'
+            });
         }
-    }, [product]);
+    }, [product, isOpen]);
 
     if (!isOpen) return null;
 
@@ -50,7 +61,11 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
         setError(null);
 
         try {
-            await productApi.update(product.id, formData);
+            if (product && product.id) {
+                await productApi.update(product.id, formData);
+            } else {
+                await productApi.create(formData);
+            }
             onSave();
             onClose();
         } catch (err: any) {
@@ -65,7 +80,9 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 animate-fade-in">
             <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
                 <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-700">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Edit Product</h2>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                        {product ? 'Edit Product' : 'Add New Product'}
+                    </h2>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                         <X size={24} />
                     </button>
@@ -80,6 +97,41 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Item Code</label>
+                            <input
+                                name="itemCode"
+                                value={formData.itemCode || ''}
+                                onChange={handleChange}
+                                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Vendor/Supplier</label>
+                            {suppliers.length > 0 ? (
+                                <select
+                                    name="supplier"
+                                    value={formData.supplier || ''}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2"
+                                    required
+                                >
+                                    <option value="">Select Vendor...</option>
+                                    {suppliers.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    name="supplier"
+                                    value={formData.supplier || ''}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2"
+                                    required
+                                />
+                            )}
+                        </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Product Name</label>
                             <input
@@ -194,7 +246,7 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, isO
                     <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-700 mt-6">
                         <Button variant="secondary" onClick={onClose} type="button">Cancel</Button>
                         <Button type="submit" disabled={isLoading}>
-                            {isLoading ? 'Saving...' : 'Save Changes'}
+                            {isLoading ? 'Saving...' : (product ? 'Save Changes' : 'Create Product')}
                         </Button>
                     </div>
                 </form>

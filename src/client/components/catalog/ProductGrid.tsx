@@ -11,9 +11,10 @@ interface ProductGridProps {
     onEdit?: (product: IProduct) => void;
     viewMode: 'grid' | 'list';
     isDarkMode?: boolean;
+    isAdmin?: boolean;
 }
 
-export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, onAdd, onEdit, viewMode, isDarkMode }) => {
+export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, onAdd, onEdit, viewMode, isDarkMode, isAdmin }) => {
     if (viewMode === 'grid') {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
@@ -25,6 +26,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                         onAdd={onAdd}
                         onEdit={onEdit}
                         isDarkMode={isDarkMode}
+                        isAdmin={isAdmin}
                     />
                 ))}
             </div>
@@ -42,6 +44,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                             <th className="py-5 px-6 text-left">Format</th>
                             <th className="py-5 px-6 text-left">Type</th>
                             <th className="py-5 px-6 text-right">Unit Net</th>
+                            {isAdmin && <th className="py-5 px-6 text-right text-rose-600 dark:text-rose-400">FOB</th>}
                             <th className="py-5 px-8 text-center">Action</th>
                         </tr>
                     </thead>
@@ -85,6 +88,13 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                                             ${calc.frontlinePrice}
                                         </span>
                                     </td>
+                                    {isAdmin && (
+                                        <td className="py-4 px-6 text-right">
+                                            <span className="text-xs font-bold text-rose-600 dark:text-rose-400">
+                                                ${typeof product.fobCasePrice === 'number' ? product.fobCasePrice.toFixed(2) : product.fobCasePrice}
+                                            </span>
+                                        </td>
+                                    )}
                                     <td className="py-4 px-8 text-center">
                                         <button
                                             onClick={() => onAdd(product, calc)}

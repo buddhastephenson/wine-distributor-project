@@ -44,20 +44,38 @@ export const OrdersPage: React.FC = () => {
         });
     }, [specialOrders]);
 
+    const [searchQuery, setSearchQuery] = useState('');
+
     // Admin: Get Unique Customers
     const customers = useMemo(() => {
         if (user?.type !== 'admin') return [];
         const allOrders = [...pendingOrders, ...submittedOrders];
         const unique = Array.from(new Set(allOrders.map(o => o.username || 'Unknown')));
-        return unique.sort();
-    }, [pendingOrders, submittedOrders, user?.type]);
 
-    // Default select first customer if none selected
+        // Filter by search query
+        const filtered = unique.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        // Sort alphabetically (case-insensitive)
+        return filtered.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    }, [pendingOrders, submittedOrders, user?.type, searchQuery]);
+    // Clear Notifications when viewing
     useEffect(() => {
-        if (user?.type === 'admin' && customers.length > 0 && !selectedCustomer) {
-            setSelectedCustomer(customers[0]);
+        // Admin viewing customer
+        if (user?.type === 'admin' && selectedCustomer) {
+            const unseenOrders = pendingOrders
+                .filter(o => (o.username || 'Unknown') === selectedCustomer && o.adminUnseen);
+
+            if (unseenOrders.length > 0) {
+                unseenOrders.forEach(o => updateSpecialOrder(o.id, { adminUnseen: false }));
+            }
         }
-    }, [customers, selectedCustomer, user?.type]);
+
+        // Customer viewing their own list
+        if (user?.type !== 'admin' && pendingOrders.some(o => o.hasUnseenUpdate)) {
+            const unseenOrders = pendingOrders.filter(o => o.hasUnseenUpdate);
+            unseenOrders.forEach(o => updateSpecialOrder(o.id, { hasUnseenUpdate: false }));
+        }
+    }, [selectedCustomer, pendingOrders, user?.type, updateSpecialOrder]);
 
 
     // Filtered Lists based on Role/Selection
@@ -86,7 +104,7 @@ export const OrdersPage: React.FC = () => {
 
     const handleSubmitRequest = async () => {
         for (const order of displayedPending) {
-            await updateSpecialOrder(order.id, { submitted: true, status: 'Pending' });
+            await updateSpecialOrder(order.id, { submitted: true, status: 'Pending', adminUnseen: true });
         }
         setSuccessMessage('Request Submitted!');
         window.scrollTo(0, 0);
@@ -206,11 +224,18 @@ export const OrdersPage: React.FC = () => {
                 {/* Left Sidebar (Customers) - Only for Admin */}
                 {user?.type === 'admin' && (
                     <div className="w-1/4 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col shadow-sm">
-                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 space-y-3">
                             <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                                 <Users className="w-4 h-4" />
                                 Customers ({customers.length})
                             </h3>
+                            <input
+                                type="text"
+                                placeholder="Search customers..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                            />
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-1">
                             {customers.map(customer => {
@@ -224,11 +249,11 @@ export const OrdersPage: React.FC = () => {
                                             : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                                             }`}
                                     >
-                                        <div className="flex items-center gap-2">
-                                            <span>{customer}</span>
-                                            {hasPending && <span className="w-2 h-2 rounded-full bg-rose-500"></span>}
+                                        <div className="flex items-center gap-2 truncate">
+                                            <span className="truncate">{customer}</span>
+                                            {hasPending && pendingOrders.filter(o => (o.username || 'Unknown') === customer).some(o => o.adminUnseen) && <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>}
                                         </div>
-                                        {selectedCustomer === customer && <ChevronRight className="w-4 h-4" />}
+                                        {selectedCustomer === customer && <ChevronRight className="w-4 h-4 shrink-0" />}
                                     </button>
                                 );
                             })}
@@ -245,8 +270,12 @@ export const OrdersPage: React.FC = () => {
                         {/* Pending Requests */}
                         <div className="space-y-4">
                             <div className="flex justify-between items-end px-2">
-                                <h3 className="text-xl font-bold text-slate-800 dark:text-white">
-                                    {user?.type === 'admin' ? `Requests Needed: ${selectedCustomer || ''}` : `New Requests (${displayedPending.length})`}
+                                <h3 className={`text-xl font-bold ${(user?.type === 'admin' && displayedPending.some(o => o.adminUnseen)) ||
+                                    (user?.type !== 'admin' && displayedPending.some(o => o.hasUnseenUpdate))
+                                    ? 'text-rose-600 animate-pulse'
+                                    : 'text-slate-800 dark:text-white'
+                                    }`}>
+                                    {user?.type === 'admin' ? `Requests Needed: ${selectedCustomer || ''}` : `My Wish List (${displayedPending.length})`}
                                 </h3>
                                 {displayedPending.length > 0 && user?.type !== 'admin' && (
                                     <button

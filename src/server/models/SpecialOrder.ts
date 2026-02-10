@@ -31,6 +31,7 @@ const SpecialOrderSchema: Schema = new Schema({
     submitted: { type: Boolean, default: false },
     isArchived: { type: Boolean, default: false },
     hasUnseenUpdate: { type: Boolean, default: false },
+    adminUnseen: { type: Boolean, default: true }, // Default to true for new orders
     messages: [{
         id: String,
         text: String,

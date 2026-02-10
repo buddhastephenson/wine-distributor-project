@@ -1,0 +1,1 @@
+const connectDB = require('../src/db/connect'); const User = require('../src/models/User'); const Product = require('../src/models/Product'); (async () => { await connectDB(); console.log('Users:', await User.countDocuments()); console.log('Products:', await Product.countDocuments()); process.exit(); })();

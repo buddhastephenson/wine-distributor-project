@@ -53,9 +53,10 @@ export const authApi = {
 
 export const productApi = {
     getAll: () => api.get<IProduct[]>('/products'),
+    create: (data: Partial<IProduct>) => api.post<{ success: boolean; product: IProduct }>('/products', data),
     update: (id: string, updates: Partial<IProduct>) => api.patch<{ success: boolean; product: IProduct }>(`/products/${id}`, updates),
     delete: (id: string) => api.delete<{ success: boolean }>(`/products/${id}`),
-    import: (products: any[], supplier: string) => api.post<{ success: boolean; stats: any }>('/products/import', { products, supplier }),
+    import: (products: any[], supplier: string, vendorId?: string, newVendorName?: string) => api.post<{ success: boolean; stats: any }>('/products/import', { products, supplier, vendorId, newVendorName }),
 };
 
 export const specialOrderApi = {

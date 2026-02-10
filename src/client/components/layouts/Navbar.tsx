@@ -1,11 +1,25 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { ShoppingCart, LogOut, User } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useProductStore } from '../../store/useProductStore';
 
 export const Navbar: React.FC = () => {
     const { logout, user, originalUser, stopImpersonating } = useAuthStore();
+    const { specialOrders, fetchSpecialOrders } = useProductStore();
     const navigate = useNavigate();
+
+    // Fetch orders for customer notification check
+    useEffect(() => {
+        if (user && user.type !== 'admin') {
+            fetchSpecialOrders(user.username);
+        }
+    }, [user, fetchSpecialOrders]);
+
+    const hasNotification = useMemo(() => {
+        if (user?.type === 'admin') return false;
+        return specialOrders.some(o => o.hasUnseenUpdate);
+    }, [specialOrders, user]);
 
     return (
         <nav className="bg-white shadow-sm border-b border-gray-200">
@@ -36,7 +50,7 @@ export const Navbar: React.FC = () => {
                                             `inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
                                                 ? 'border-indigo-500 text-gray-900'
                                                 : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                                            }`
+                                            } ${hasNotification ? 'text-red-600 animate-pulse font-bold' : ''}`
                                         }
                                     >
                                         My Wish List

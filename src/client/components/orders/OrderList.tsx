@@ -37,7 +37,17 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
         };
 
         const updatedMessages = [...(order.messages || []), newMessage];
-        onUpdate(orderId, { messages: updatedMessages, hasUnseenUpdate: true });
+        const updates: Partial<ISpecialOrder> = { messages: updatedMessages };
+
+        if (!currentUser.isSuperAdmin && currentUser.type !== 'admin') {
+            updates.hasUnseenUpdate = false; // Seen by customer
+            updates.adminUnseen = true; // Unseen by admin
+        } else {
+            updates.hasUnseenUpdate = true; // Unseen by customer
+            updates.adminUnseen = false; // Seen by admin
+        }
+
+        onUpdate(orderId, updates);
     };
 
     return (
@@ -66,15 +76,18 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                             </div>
                             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">${item.frontlinePrice} / unit</p>
                         </div>
-                        {!isReadOnly && (!item.submitted || currentUser?.type === 'admin') && (
-                            <button
-                                onClick={() => onDelete(item.id)}
-                                className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Remove Item"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        )}
+                        {!isReadOnly && (
+                            currentUser?.type === 'admin' ||
+                            (!item.submitted && item.status === 'Pending')
+                        ) && (
+                                <button
+                                    onClick={() => onDelete(item.id)}
+                                    className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                    title="Remove Item"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
@@ -115,7 +128,7 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                             <div className="relative">
                                 <select
                                     value={item.status || ORDER_STATUS.PENDING}
-                                    onChange={(e) => onUpdate(item.id, { status: e.target.value })}
+                                    onChange={(e) => onUpdate(item.id, { status: e.target.value, hasUnseenUpdate: true })}
                                     className={`appearance-none text-[10px] font-black uppercase tracking-widest px-3 py-1 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/20 ${(item.status || 'Pending').includes('Pending') ? 'bg-slate-50 text-slate-400 border-slate-100' :
                                         (item.status || '').includes('On Purchase Order') ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                             (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :

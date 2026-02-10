@@ -10,6 +10,9 @@ router.use(authenticate);
 // GET /api/products
 router.get('/', ProductController.getAllProducts.bind(ProductController));
 
+// POST /api/products
+router.post('/', ProductController.createProduct.bind(ProductController));
+
 // PATCH /api/products/:id
 router.patch('/:id', ProductController.updateProduct.bind(ProductController));
 

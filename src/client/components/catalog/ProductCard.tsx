@@ -9,9 +9,10 @@ interface ProductCardProps {
     onAdd: (product: IProduct, pricing: any) => void;
     onEdit?: (product: IProduct) => void;
     isDarkMode?: boolean;
+    isAdmin?: boolean;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onAdd, onEdit, isDarkMode }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onAdd, onEdit, isDarkMode, isAdmin }) => {
     const calc = formulas ? calculateFrontlinePrice(product, formulas) : { frontlinePrice: '0.00' };
 
     return (
@@ -50,6 +51,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                         {product.appellation}
                     </p>
                 )}
+                {product.grapeVariety && (
+                    <p className="text-[11px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-widest mb-2">
+                        {product.grapeVariety}
+                    </p>
+                )}
                 {product.productLink ? (
                     <a
                         href={product.productLink.startsWith('http') ? product.productLink : `https://${product.productLink}`}
@@ -68,8 +74,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
 
                 {/* Dynamic Extra Fields Display */}
                 <div className="flex flex-wrap gap-1.5 mt-4">
+                    {/* Extended Data (Custom Columns) */}
+                    {product.extendedData && Object.entries(product.extendedData).map(([key, value]) => (
+                        <span key={key} className="inline-flex items-center px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700 shadow-sm">
+                            <span className="text-slate-300 dark:text-slate-600 mr-2">{key}:</span> <span className="text-slate-600 dark:text-slate-300">{String(value)}</span>
+                        </span>
+                    ))}
+
+                    {/* Legacy/Top-Level Dynamic Fields */}
                     {Object.entries(product).map(([key, value]) => {
-                        const standardFields = ['id', 'itemCode', 'producer', 'productName', 'vintage', 'packSize', 'bottleSize', 'productType', 'fobCasePrice', 'productLink', 'supplier', 'uploadDate', 'frontlinePrice', 'frontlineCase', 'srp', 'whlsBottle', 'whlsCase', 'laidIn', 'formulaUsed', 'country', 'region', 'appellation'];
+                        const standardFields = ['id', 'itemCode', 'producer', 'productName', 'vintage', 'packSize', 'bottleSize', 'productType', 'fobCasePrice', 'productLink', 'supplier', 'uploadDate', 'frontlinePrice', 'frontlineCase', 'srp', 'whlsBottle', 'whlsCase', 'laidIn', 'formulaUsed', 'country', 'region', 'appellation', 'grapeVariety', 'extendedData'];
                         if (standardFields.includes(key) || !value || typeof value === 'object') return null;
                         return (
                             <span key={key} className="inline-flex items-center px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700 shadow-sm">
@@ -102,6 +116,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                         <p className="text-sm font-black text-slate-900 dark:text-white tracking-wide uppercase">
                             {product.vintage || 'NV'}
                         </p>
+                        {isAdmin && (
+                            <p className="text-[10px] font-bold text-rose-500 dark:text-rose-400 mt-1 uppercase tracking-wider">
+                                FOB: ${typeof product.fobCasePrice === 'number' ? product.fobCasePrice.toFixed(2) : product.fobCasePrice}
+                            </p>
+                        )}
                     </div>
                 </div>
 

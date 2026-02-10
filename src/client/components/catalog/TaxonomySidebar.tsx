@@ -18,6 +18,9 @@ interface TaxonomySidebarProps {
     uniqueRegions: string[];
     uniqueAppellations: string[];
     suppliers: string[];
+    bottleSizes: string[];
+    selectedBottleSize: string;
+    setSelectedBottleSize: (size: string) => void;
     resetFilters: () => void;
 }
 
@@ -38,6 +41,9 @@ export const TaxonomySidebar: React.FC<TaxonomySidebarProps> = ({
     uniqueRegions,
     uniqueAppellations,
     suppliers,
+    bottleSizes,
+    selectedBottleSize,
+    setSelectedBottleSize,
     resetFilters,
 }) => {
     return (
@@ -112,6 +118,21 @@ export const TaxonomySidebar: React.FC<TaxonomySidebarProps> = ({
                         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500 pointer-events-none" />
                     </div>
                 </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Bottle Size</label>
+                    <div className="relative">
+                        <select
+                            value={selectedBottleSize}
+                            onChange={(e) => setSelectedBottleSize(e.target.value)}
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-bold text-xs appearance-none cursor-pointer pr-8 text-slate-700 dark:text-slate-200 truncate"
+                        >
+                            <option value="all">All Sizes</option>
+                            {bottleSizes.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
@@ -162,6 +183,6 @@ export const TaxonomySidebar: React.FC<TaxonomySidebarProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

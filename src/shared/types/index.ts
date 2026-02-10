@@ -35,6 +35,8 @@ export interface IProduct {
     whlsCase?: string;
     laidIn?: string;
     formulaUsed?: string;
+    grapeVariety?: string; // New: Imported from price list
+    extendedData?: Record<string, string | number>; // New: Custom columns
 }
 
 export const ORDER_STATUS = {
@@ -77,7 +79,8 @@ export interface ISpecialOrder {
     adminNotes?: string;
     submitted?: boolean;
     isArchived?: boolean;
-    hasUnseenUpdate?: boolean;
+    hasUnseenUpdate?: boolean; // For customer
+    adminUnseen?: boolean; // For admin
     messages?: IOrderMessage[];
     createdAt?: string | Date; // Added for sorting
 }

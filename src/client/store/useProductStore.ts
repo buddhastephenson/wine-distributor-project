@@ -75,7 +75,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
 
         try {
             await specialOrderApi.update(id, updates);
-        } catch (error) {
+        } catch (error: any) {
+            console.error('Update Order Failed:', error.response?.data || error.message);
             set({ specialOrders: prevOrders, error: 'Failed to update order' });
         }
     },

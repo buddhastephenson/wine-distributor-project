@@ -6,13 +6,11 @@ class SpecialOrderController {
         try {
             const { username } = req.query;
             let orders;
+            const user = (req as any).user;
             if (username && typeof username === 'string') {
-                orders = await SpecialOrderService.getSpecialOrdersByUsername(username); // Username filter overrides? or ANDs? 
-                // Actually if a Vendor queries by username, they should still only see that user's orders FOR THAT VENDOR.
-                // So we should probably pass user to both.
-                orders = await SpecialOrderService.getSpecialOrdersByUsername(username, req.user);
+                orders = await SpecialOrderService.getSpecialOrdersByUsername(username, user);
             } else {
-                orders = await SpecialOrderService.getAllSpecialOrders(req.user);
+                orders = await SpecialOrderService.getAllSpecialOrders(user);
             }
             res.json(orders);
         } catch (error) {
@@ -34,7 +32,13 @@ class SpecialOrderController {
     async updateSpecialOrder(req: Request, res: Response) {
         const { id } = req.params;
         try {
-            const order = await SpecialOrderService.updateSpecialOrder(id as string, req.body);
+            const updates = { ...req.body };
+            // If admin is updating, flag it for the customer
+            if ((req as any).user?.type === 'admin') {
+                updates.hasUnseenUpdate = true;
+            }
+
+            const order = await SpecialOrderService.updateSpecialOrder(id as string, updates);
             if (!order) return res.status(404).json({ error: 'Order not found' });
             res.json({ success: true, order });
         } catch (error) {
@@ -48,6 +52,12 @@ class SpecialOrderController {
             if (!Array.isArray(updates)) {
                 return res.status(400).json({ error: 'Invalid data format' });
             }
+
+            // If admin, append hasUnseenUpdate to each
+            if ((req as any).user?.type === 'admin') {
+                updates.forEach(u => (u as any).hasUnseenUpdate = true);
+            }
+
             const result = await SpecialOrderService.batchUpdateStatus(updates);
             res.json({ success: true, ...result });
         } catch (error) {

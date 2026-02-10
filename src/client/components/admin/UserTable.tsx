@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { IUser } from '../../../shared/types'; // Correct relative path
 import { Button } from '../shared/Button';
+import { ConfirmationModal } from '../shared/ConfirmationModal';
 import { Edit2, Lock, Unlock, Trash2, UserCheck, Search, Key } from 'lucide-react';
 import { userApi } from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -38,78 +39,89 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
         }
     };
 
-    const handleDelete = async (userId: string) => {
-        if (!window.confirm('Are you sure you want to delete this user?')) return;
-        setIsLoading(userId);
+    // Role Management Modal State
+    const [showRoleModal, setShowRoleModal] = useState(false);
+    const [selectedUserForRole, setSelectedUserForRole] = useState<IUser | null>(null);
+
+    // Delete Confirmation Modal State
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<IUser | null>(null);
+
+    const handleDeleteClick = (user: IUser) => {
+        console.log('Delete requested for:', user);
+        setUserToDelete(user);
+        setShowDeleteModal(true);
+    };
+
+
+    const confirmDelete = async () => {
+        if (!userToDelete) return;
+        setIsLoading(userToDelete.id);
+
         try {
-            await userApi.delete(userId);
+            await userApi.delete(userToDelete.id);
+            setShowDeleteModal(false);
+            setUserToDelete(null);
             onRefresh();
         } catch (error) {
             console.error('Failed to delete user', error);
+            alert('Failed to delete user');
         } finally {
             setIsLoading(null);
         }
     };
+    const [selectedRoleType, setSelectedRoleType] = useState<'customer' | 'admin' | 'vendor'>('customer');
+    const [vendorListInput, setVendorListInput] = useState('');
 
-    const [showVendorModal, setShowVendorModal] = useState(false);
-    const [selectedUserForVendor, setSelectedUserForVendor] = useState<IUser | null>(null);
-    const [selectedVendors, setSelectedVendors] = useState<string[]>([]);
-    const [availableVendors, setAvailableVendors] = useState<string[]>([]); // Should fetch from product store
+    const handleEditRole = (user: IUser) => {
+        setSelectedUserForRole(user);
 
-    // Fetch vendors on mount or when opening modal
-    //Ideally this should come from a store or props to avoid prop drilling or extra fetches
-    // For now, let's assume we can pass them in or fetch them.
-    // Let's use useProductStore if available in this context?
-    // Or just simple hardcoded list for now based on known suppliers?
-    // Better: Fetch products to derive unique suppliers.
-
-    const handlePromote = async (user: IUser) => {
-        if (!window.confirm(`Are you sure you want to promote ${user.username} to Admin?`)) return;
-        setIsLoading(user.id);
-        try {
-            await userApi.updateRole(user.id, 'admin'); // Default to full admin first? Or ask?
-            // Actually request implies upgrading to Rep (Admin) or Vendor (Limited Admin)
-            // Let's just make them Admin for now.
-            onRefresh();
-        } catch (error) {
-            console.error('Failed to promote user', error);
-        } finally {
-            setIsLoading(null);
+        // Determine current role state
+        if (user.type === 'customer') {
+            setSelectedRoleType('customer');
+            setVendorListInput('');
+        } else if (user.type === 'admin') {
+            if (user.vendors && user.vendors.length > 0) {
+                setSelectedRoleType('vendor');
+                setVendorListInput(user.vendors.join(', '));
+            } else {
+                setSelectedRoleType('admin');
+                setVendorListInput('');
+            }
         }
+
+        setShowRoleModal(true);
     };
 
-    const [vendorInput, setVendorInput] = useState('');
-
-    const handleManageVendors = (user: IUser) => {
-        setSelectedUserForVendor(user);
-        setVendorInput((user.vendors || []).join(', '));
-        setShowVendorModal(true);
-    };
-
-    const saveVendorAssignment = async () => {
-        if (!selectedUserForVendor) return;
-        setIsLoading(selectedUserForVendor.id);
-
-        // Parse input on save
-        const updatedVendors = vendorInput.split(',').map(s => s.trim()).filter(Boolean);
+    const saveRoleConfig = async () => {
+        if (!selectedUserForRole) return;
+        setIsLoading(selectedUserForRole.id);
 
         try {
-            await userApi.updateRole(selectedUserForVendor.id, 'admin', updatedVendors);
-            setShowVendorModal(false);
+            let type: 'customer' | 'admin' = 'customer';
+            let vendors: string[] = [];
+
+            if (selectedRoleType === 'customer') {
+                type = 'customer';
+                vendors = [];
+            } else if (selectedRoleType === 'admin') {
+                type = 'admin';
+                vendors = [];
+            } else if (selectedRoleType === 'vendor') {
+                type = 'admin';
+                // Auto-assign the username as the vendor/supplier
+                vendors = [selectedUserForRole.username];
+            }
+
+            await userApi.updateRole(selectedUserForRole.id, type, vendors);
+            setShowRoleModal(false);
             onRefresh();
         } catch (error) {
-            console.error('Failed to update vendors', error);
+            console.error('Failed to update role', error);
+            alert('Failed to update user role');
         } finally {
             setIsLoading(null);
         }
-    };
-
-    // Helper to toggle vendor selection
-    const toggleVendor = (vendor: string) => {
-        // Legacy or unused? The modal uses text input now.
-        // Keeping logic just in case but modifying to work with string input if needed? 
-        // Actually this was for checkboxes. Let's ignore or update if used.
-        // It's not used in current modal render.
     };
 
     // Quick Add Modal State
@@ -204,30 +216,62 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                 </div>
             )}
 
-            {/* Vendor Assignment Modal */}
+            {/* Role Management Modal */}
             {
-                showVendorModal && selectedUserForVendor && (
+                showRoleModal && selectedUserForRole && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                        <div className="bg-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
-                            <h3 className="text-lg font-bold mb-4">Assign Vendors to {selectedUserForVendor.username}</h3>
-                            <p className="text-sm text-gray-500 mb-4">Select vendors this user is allowed to manage.</p>
+                        <div className="bg-white p-6 rounded-lg w-96 max-h-[90vh] overflow-y-auto">
+                            <h3 className="text-lg font-bold mb-4">Edit Role for {selectedUserForRole.username}</h3>
 
-                            <div className="space-y-2 mb-6">
-                                <div className="text-xs text-slate-500">
-                                    Enter exact Supplier names from the catalog, separated by commas.
-                                    <br />Example: <em>Rosenthal Wine Merchant, Bon Vivant Imports</em>
-                                </div>
-                                <textarea
-                                    className="w-full border rounded p-2 text-sm"
-                                    rows={4}
-                                    value={vendorInput}
-                                    onChange={(e) => setVendorInput(e.target.value)}
-                                />
+                            <div className="space-y-4 mb-6">
+                                <label className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                                    <input
+                                        type="radio"
+                                        name="role"
+                                        checked={selectedRoleType === 'customer'}
+                                        onChange={() => setSelectedRoleType('customer')}
+                                        className="mt-1"
+                                    />
+                                    <div>
+                                        <div className="font-bold text-slate-800">Customer</div>
+                                        <div className="text-xs text-slate-500">Standard user. Can view catalog and Request items.</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                                    <input
+                                        type="radio"
+                                        name="role"
+                                        checked={selectedRoleType === 'admin'}
+                                        onChange={() => setSelectedRoleType('admin')}
+                                        className="mt-1"
+                                    />
+                                    <div>
+                                        <div className="font-bold text-purple-800">Admin (Staff)</div>
+                                        <div className="text-xs text-slate-500">Full access to manage products, orders, and customers.</div>
+                                    </div>
+                                </label>
+
+                                <label className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                                    <input
+                                        type="radio"
+                                        name="role"
+                                        checked={selectedRoleType === 'vendor'}
+                                        onChange={() => setSelectedRoleType('vendor')}
+                                        className="mt-1"
+                                    />
+                                    <div>
+                                        <div className="font-bold text-indigo-800">Vendor (Restricted)</div>
+                                        <div className="text-xs text-slate-500">
+                                            Restricted Admin. <strong>{selectedUserForRole.username}</strong> will be the only accessible Supplier.
+                                        </div>
+                                    </div>
+                                </label>
                             </div>
 
                             <div className="flex justify-end space-x-2">
-                                <Button variant="secondary" onClick={() => setShowVendorModal(false)}>Cancel</Button>
-                                <Button onClick={saveVendorAssignment}>Save</Button>
+                                <Button variant="secondary" onClick={() => setShowRoleModal(false)}>Cancel</Button>
+                                <Button onClick={saveRoleConfig}>Save Role</Button>
                             </div>
                         </div>
                     </div>
@@ -256,6 +300,17 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                     </div>
                 )
             }
+
+            <ConfirmationModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={confirmDelete}
+                title="Delete User"
+                message={`Are you sure you want to delete ${userToDelete?.username}? This action cannot be undone.`}
+                confirmLabel="Delete"
+                isLoading={isLoading === userToDelete?.id}
+                variant="danger"
+            />
 
             <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
                 <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
@@ -286,10 +341,14 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.type === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                {user.type}
+                                                {user.type === 'admin' && user.vendors && user.vendors.length > 0 ? 'Vendor' : user.type}
                                                 {user.isSuperAdmin && ' (Super)'}
-                                                {user.vendors && user.vendors.length > 0 && ' (Vendor)'}
                                             </span>
+                                            {user.type === 'admin' && user.vendors && user.vendors.length > 0 && (
+                                                <div className="text-xs text-gray-500 mt-1 max-w-[150px] truncate" title={user.vendors.join(', ')}>
+                                                    {user.vendors.join(', ')}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {user.accessRevoked ? (
@@ -305,23 +364,14 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             {isSuperAdmin && (
                                                 <>
-                                                    {user.type === 'customer' && (
-                                                        <button
-                                                            onClick={() => handlePromote(user)}
-                                                            disabled={isLoading === user.id}
-                                                            className="text-indigo-600 hover:text-indigo-900 mr-4 font-bold"
-                                                        >
-                                                            Promote
-                                                        </button>
-                                                    )}
-                                                    {user.type === 'admin' && (
-                                                        <button
-                                                            onClick={() => handleManageVendors(user)}
-                                                            className="text-blue-600 hover:text-blue-900 mr-4 font-bold"
-                                                        >
-                                                            Vendors
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        onClick={() => handleEditRole(user)}
+                                                        disabled={isLoading === user.id}
+                                                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                                        title="Edit Role & Permissions"
+                                                    >
+                                                        <Edit2 size={18} />
+                                                    </button>
 
                                                     <button
                                                         onClick={() => handlePasswordResetClick(user)}
@@ -340,7 +390,7 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                                         {user.accessRevoked ? <Unlock size={18} /> : <Lock size={18} />}
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDelete(user.id)}
+                                                        onClick={() => handleDeleteClick(user)}
                                                         disabled={isLoading === user.id}
                                                         className="text-red-600 hover:text-red-900"
                                                         title="Delete User"

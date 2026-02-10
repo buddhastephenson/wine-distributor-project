@@ -16,7 +16,7 @@ router.post('/', SpecialOrderController.createSpecialOrder.bind(SpecialOrderCont
 // Batch Update (Must come before :id routes to avoid conflict if logic was different, though here 'batch-status' is distinct from ':id')
 router.post('/batch-status', authenticate, SpecialOrderController.batchUpdateStatus.bind(SpecialOrderController));
 
-router.put('/:id', authenticate, SpecialOrderController.updateSpecialOrder.bind(SpecialOrderController));
+router.patch('/:id', authenticate, SpecialOrderController.updateSpecialOrder.bind(SpecialOrderController));
 
 // DELETE /api/special-orders/:id
 router.delete('/:id', SpecialOrderController.deleteSpecialOrder.bind(SpecialOrderController));

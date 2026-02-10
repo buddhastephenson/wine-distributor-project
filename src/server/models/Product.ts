@@ -15,6 +15,8 @@ const ProductSchema: Schema = new Schema({
     country: { type: String, default: '' },
     region: { type: String, default: '' },
     appellation: { type: String, default: '' },
+    grapeVariety: { type: String, default: '' },
+    extendedData: { type: Schema.Types.Mixed, default: {} },
     supplier: { type: String, default: '' },
     uploadDate: { type: Date, default: Date.now }
 }, {

@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { TaxonomySidebar } from '../../components/catalog/TaxonomySidebar';
 import { ProductGrid } from '../../components/catalog/ProductGrid';
 import { ProductEditModal } from '../../components/catalog/ProductEditModal';
-import { LayoutGrid, List, CheckCircle, Download } from 'lucide-react';
+import { LayoutGrid, List, CheckCircle, Download, Plus } from 'lucide-react';
 import { calculateFrontlinePrice } from '../../utils/formulas';
 import { exportProductsToExcel } from '../../utils/export';
 import { IProduct } from '../../../shared/types';
@@ -17,6 +17,7 @@ export const CatalogPage: React.FC = () => {
     const [selectedRegion, setSelectedRegion] = useState('all');
     const [selectedAppellation, setSelectedAppellation] = useState('all');
     const [selectedSupplier, setSelectedSupplier] = useState('all');
+    const [selectedSize, setSelectedSize] = useState('all');
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [editingProduct, setEditingProduct] = useState<IProduct | null>(null);
@@ -60,6 +61,11 @@ export const CatalogPage: React.FC = () => {
         return Array.from(suppliers).sort() as string[];
     }, [allowedProducts]);
 
+    const uniqueBottleSizes = useMemo(() => {
+        const sizes = new Set(allowedProducts.map(p => p.bottleSize).filter(Boolean));
+        return Array.from(sizes).sort() as string[];
+    }, [allowedProducts]);
+
 
     // Filter Products
     const filteredProducts = useMemo(() => {
@@ -79,6 +85,7 @@ export const CatalogPage: React.FC = () => {
             if (selectedRegion !== 'all' && product.region !== selectedRegion) return false;
             if (selectedAppellation !== 'all' && product.appellation !== selectedAppellation) return false;
             if (selectedSupplier !== 'all' && product.supplier !== selectedSupplier) return false;
+            if (selectedSize !== 'all' && product.bottleSize !== selectedSize) return false;
 
             // Price Range
             if (formulas) {
@@ -106,7 +113,7 @@ export const CatalogPage: React.FC = () => {
             };
             return getRank(a.bottleSize) - getRank(b.bottleSize);
         });
-    }, [allowedProducts, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, priceRange, formulas]);
+    }, [allowedProducts, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, selectedSize, priceRange, formulas]);
 
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -170,6 +177,7 @@ export const CatalogPage: React.FC = () => {
         setSelectedRegion('all');
         setSelectedAppellation('all');
         setSelectedSupplier('all');
+        setSelectedSize('all');
         setPriceRange([0, 10000]);
     };
 
@@ -202,7 +210,12 @@ export const CatalogPage: React.FC = () => {
     };
 
     const handleExport = () => {
-        exportProductsToExcel(filteredProducts, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
+        const productsWithPricing = filteredProducts.map(p => {
+            if (!formulas) return p;
+            const pricing = calculateFrontlinePrice(p, formulas);
+            return { ...p, ...pricing };
+        });
+        exportProductsToExcel(productsWithPricing, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const handleEditProduct = (product: IProduct) => {
@@ -221,6 +234,11 @@ export const CatalogPage: React.FC = () => {
         setIsEditModalOpen(true);
     };
 
+    const handleAddNewProduct = () => {
+        setEditingProduct(null);
+        setIsEditModalOpen(true);
+    };
+
     const handleSaveEdit = () => {
         fetchProducts(); // Refresh list
         setSuccessMessage(`Product updated successfully.`);
@@ -228,12 +246,13 @@ export const CatalogPage: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-fade-in-up">
-            {editingProduct && (
+            {isEditModalOpen && (
                 <ProductEditModal
                     product={editingProduct}
                     isOpen={isEditModalOpen}
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={handleSaveEdit}
+                    suppliers={uniqueSuppliers}
                 />
             )}
 
@@ -248,12 +267,15 @@ export const CatalogPage: React.FC = () => {
                 setSelectedAppellation={setSelectedAppellation}
                 selectedSupplier={selectedSupplier}
                 setSelectedSupplier={setSelectedSupplier}
+                selectedBottleSize={selectedSize}
+                setSelectedBottleSize={setSelectedSize}
                 priceRange={priceRange}
                 setPriceRange={setPriceRange}
                 uniqueCountries={uniqueCountries}
                 uniqueRegions={uniqueRegions}
                 uniqueAppellations={uniqueAppellations}
                 suppliers={uniqueSuppliers}
+                bottleSizes={uniqueBottleSizes}
                 resetFilters={resetFilters}
             />
 
@@ -272,6 +294,16 @@ export const CatalogPage: React.FC = () => {
                     Viewing {filteredProducts.length} Products
                 </h2>
                 <div className="flex items-center space-x-4">
+                    {user?.type === 'admin' && (
+                        <button
+                            onClick={handleAddNewProduct}
+                            className="flex items-center space-x-2 bg-rose-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-rose-700 transition-colors shadow-sm"
+                        >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Product</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={handleExport}
                         className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"
@@ -303,6 +335,7 @@ export const CatalogPage: React.FC = () => {
                 onAdd={handleAddProduct}
                 onEdit={user?.type === 'admin' ? handleEditProduct : undefined}
                 viewMode={viewMode}
+                isAdmin={user?.type === 'admin'}
             />
         </div>
     );

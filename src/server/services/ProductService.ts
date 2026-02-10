@@ -4,6 +4,8 @@ import { IProduct } from '../../shared/types';
 
 import { IUser } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
+import AuthService from './AuthService';
+import User from '../models/User';
 
 class ProductService {
     async getAllProducts(user?: IUser): Promise<IProduct[]> {
@@ -34,9 +36,68 @@ class ProductService {
         return !!result;
     }
 
+    async createProduct(productData: Partial<IProduct>): Promise<IProduct> {
+        const newProduct = new Product({
+            id: uuidv4(),
+            ...productData,
+            uploadDate: new Date()
+        });
+        const savedProduct = await newProduct.save();
+        return savedProduct.toObject();
+    }
 
 
-    async bulkImport(products: IProduct[], supplier: string): Promise<{ added: number, updated: number, deleted: number, kept: number, supplier: string }> {
+
+    async bulkImport(products: IProduct[], supplier: string, vendorId?: string, newVendorName?: string): Promise<{ added: number, updated: number, deleted: number, kept: number, supplier: string }> {
+
+        // --- VENDOR ASSOCIATION LOGIC ---
+        if (vendorId || newVendorName) {
+            console.log(`Processing Vendor Association: ID=${vendorId}, NewName=${newVendorName}`);
+            if (newVendorName) {
+                // Create New Vendor User
+                try {
+                    const result = await AuthService.quickCreateCustomer(newVendorName);
+                    if (result.success && result.user) {
+                        console.log(`Created new vendor user: ${result.user.username} (${result.user.id})`);
+                        // Promote to Admin/Vendor and assign supplier
+                        await User.findOneAndUpdate(
+                            { id: result.user.id },
+                            {
+                                type: 'admin',
+                                vendors: [supplier]
+                            }
+                        );
+                        console.log(`Promoted ${result.user.username} to Admin with vendor ${supplier}`);
+                    } else {
+                        console.error(`Failed to create new vendor user: ${result.error}`);
+                        throw new Error(`Failed to create vendor: ${result.error}`);
+                    }
+                } catch (e: any) {
+                    console.error('Vendor creation error:', e);
+                    throw new Error(`Vendor creation failed: ${e.message}`);
+                }
+            } else if (vendorId) {
+                // Update Existing Vendor
+                try {
+                    const user = await User.findOne({ id: vendorId });
+                    if (user) {
+                        // Add supplier if not present
+                        if (!user.vendors) user.vendors = [];
+                        if (!user.vendors.includes(supplier)) {
+                            user.vendors.push(supplier);
+                            await user.save();
+                            console.log(`Added supplier ${supplier} to existing vendor ${user.username}`);
+                        }
+                    } else {
+                        console.warn(`Vendor ID ${vendorId} not found`);
+                    }
+                } catch (e) {
+                    console.error('Error updating existing vendor:', e);
+                }
+            }
+        }
+        // --------------------------------
+
         // 1. Get Active Orders for this supplier
         // Find itemCodes of products currently on active requests
         // Active = not delivered, not cancelled/archived
