@@ -140,7 +140,7 @@ class ProductController {
     }
 
     async importProducts(req: Request, res: Response) {
-        const { products, supplier } = req.body;
+        const { products, supplier, vendorId } = req.body;
         const user = req.user;
 
         let finalSupplier = supplier;
@@ -158,6 +158,12 @@ class ProductController {
             if (!user.vendors.includes(supplier)) {
                 return res.status(403).json({ error: `Unauthorized: You are not authorized to import for ${supplier}.` });
             }
+            // Restricted admins can't assign arbitrary vendors? 
+            // Currently they can only import for specific SUPPLIERS.
+            // If they are managing a supplier, they should be able to assign the vendor who owns it?
+            // Let's allow them to set vendorId if passed.
+            if (vendorId) finalVendorId = vendorId;
+
         } else if (user?.type === 'vendor') {
             finalVendorId = user.id;
 
@@ -166,9 +172,12 @@ class ProductController {
             if (!supplier) finalSupplier = user.username;
 
         } else {
+            // Super Admin
             if (!supplier) {
                 return res.status(400).json({ error: 'Supplier is required for bulk import' });
             }
+            // Use passed vendorId
+            if (vendorId) finalVendorId = vendorId;
         }
 
         try {
