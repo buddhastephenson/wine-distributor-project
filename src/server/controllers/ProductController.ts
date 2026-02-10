@@ -25,6 +25,22 @@ class ProductController {
                 if (!user.vendors.includes(productData.supplier)) {
                     return res.status(403).json({ error: 'Unauthorized: You can only create products for your assigned suppliers.' });
                 }
+            } else if (user?.type === 'vendor') {
+                // Vendor-specific logic
+                productData.vendor = user.id; // Force vendor ID
+                // If they provided a supplier, allow it (maybe they manage multiple portfolios under one name?) 
+                // BUT we should probably enforce it matches their known portfolios OR just trust them for now if they are the vendor?
+                // Plan said: Ensure `supplier` matches one of `req.user.vendors` (or if empty, use `req.user.username` as the default).
+                if (user.vendors && user.vendors.length > 0) {
+                    if (!productData.supplier || !user.vendors.includes(productData.supplier)) {
+                        // If they have effective portfolios, must match. 
+                        // Check if we should auto-assign?
+                        return res.status(403).json({ error: 'Unauthorized: You can only create products for your assigned portfolios.' });
+                    }
+                } else {
+                    // If no specific vendors list, default to their username
+                    if (!productData.supplier) productData.supplier = user.username;
+                }
             }
 
             // Basic Validation
@@ -64,6 +80,19 @@ class ProductController {
                 if (updates.supplier && !user.vendors.includes(updates.supplier)) {
                     return res.status(403).json({ error: 'Unauthorized: Cannot transfer product to another supplier.' });
                 }
+            } else if (user?.type === 'vendor') {
+                const existingProduct = await ProductService.getProductById(id as string);
+                if (!existingProduct) return res.status(404).json({ error: 'Product not found' });
+
+                // Check ownership
+                if (String(existingProduct.vendor) !== String(user.id)) {
+                    return res.status(403).json({ error: 'Unauthorized: You can only edit your own products.' });
+                }
+
+                // Prevent changing vendor ownership
+                if (updates.vendor && String(updates.vendor) !== String(user.id)) {
+                    return res.status(403).json({ error: 'Unauthorized: Cannot transfer product ownership.' });
+                }
             }
 
             const product = await ProductService.updateProduct(id as string, updates);
@@ -90,6 +119,13 @@ class ProductController {
                 if (!existingProduct.supplier || !user.vendors.includes(existingProduct.supplier)) {
                     return res.status(403).json({ error: 'Unauthorized: You can only delete your own products.' });
                 }
+            } else if (user?.type === 'vendor') {
+                const existingProduct = await ProductService.getProductById(id as string);
+                if (!existingProduct) return res.status(404).json({ error: 'Product not found' });
+
+                if (String(existingProduct.vendor) !== String(user.id)) {
+                    return res.status(403).json({ error: 'Unauthorized: You can only delete your own products.' });
+                }
             }
 
             const success = await ProductService.deleteProduct(id as string);
@@ -107,22 +143,55 @@ class ProductController {
         const { products, supplier } = req.body;
         const user = req.user;
 
+        let finalSupplier = supplier;
+        let finalVendorId = undefined;
+
         if (!products || !Array.isArray(products) || products.length === 0) {
             return res.status(400).json({ error: 'Invalid products data' });
-        }
-        if (!supplier) {
-            return res.status(400).json({ error: 'Supplier is required for bulk import' });
         }
 
         // Permission Check
         if (user?.type === 'admin' && user.vendors && user.vendors.length > 0) {
+            if (!supplier) {
+                return res.status(400).json({ error: 'Supplier is required for bulk import' });
+            }
             if (!user.vendors.includes(supplier)) {
                 return res.status(403).json({ error: `Unauthorized: You are not authorized to import for ${supplier}.` });
+            }
+        } else if (user?.type === 'vendor') {
+            finalVendorId = user.id;
+
+            // If the vendor has specific allowed portfolios, enforce them
+            if (user.vendors && user.vendors.length > 0) {
+                if (!supplier || !user.vendors.includes(supplier)) {
+                    return res.status(403).json({ error: `Unauthorized: You are not authorized to import for ${supplier || 'unknown'}.` });
+                }
+            } else {
+                // If they don't have a list, default to their username if no supplier provided
+                // Or if they provided one, treat it as a new portfolio name they are creating?
+                // Let's allow them to specify, or default to their name.
+                if (!supplier) finalSupplier = user.username;
+            }
+        } else {
+            if (!supplier) {
+                return res.status(400).json({ error: 'Supplier is required for bulk import' });
             }
         }
 
         try {
-            const stats = await ProductService.bulkImport(products, supplier);
+            // Need to pass vendorId to service? Service bulkImport doesn't seem to take vendorId yet.
+            // I need to update products array to include vendorId before passing to service, 
+            // OR update service to accept it.
+            // Service.bulkImport(products, supplier) likely iterates and upserts.
+            // Let's attach vendorId to each product in the array.
+
+            const productsWithVendor = products.map((p: any) => ({
+                ...p,
+                vendor: finalVendorId, // Might be undefined for admins, which is fine
+                supplier: finalSupplier // Ensure uniform supplier
+            }));
+
+            const stats = await ProductService.bulkImport(productsWithVendor, finalSupplier);
             res.json({ success: true, stats });
         } catch (error: any) {
             console.error('Import failed:', error);

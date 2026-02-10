@@ -1,7 +1,7 @@
 export interface IUser {
     id: string;
     username: string;
-    type: 'admin' | 'customer';
+    type: 'admin' | 'customer' | 'vendor';
     email: string;
     isSuperAdmin?: boolean;
     vendors?: string[]; // Array of supplier names for Vendor Admins
@@ -26,6 +26,7 @@ export interface IProduct {
     region?: string;
     appellation?: string;
     supplier?: string;
+    vendor?: string; // ID of the vendor user
     uploadDate?: string | Date;
     // Derived pricing fields (often computed on fly but useful in UI)
     frontlinePrice?: string;

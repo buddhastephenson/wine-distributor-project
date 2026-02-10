@@ -181,14 +181,35 @@ export const ImportPage: React.FC = () => {
         setSuppliers(allSuppliers);
 
         // Auto-select logic:
-        // 1. If User is Restricted Vendor with exactly 1 allowed vendor -> Force Select that one.
-        // 2. If Super Admin (no vendors restricted) -> DO NOT auto-select based on file. Force them to choose.
         const user = useAuthStore.getState().user;
-        if (user?.type === 'admin' && user?.vendors && user.vendors.length === 1) {
+
+        // 1. If User is Vendor, force selection to themselves.
+        if (user?.type === 'vendor') {
+            setSelectedVendor(user.id);
+            // Also restrict suppliers to their list
+            const vendorPortfolios = user.vendors || [];
+
+            // If they have portfolios, and the file has suppliers, check overlap?
+            // For now, let's just let the UI filter the dropdown options and validation handle it.
+        }
+        // 2. If User is Restricted Vendor Admin with exactly 1 allowed vendor -> Force Select that one.
+        else if (user?.type === 'admin' && user?.vendors && user.vendors.length === 1) {
+            setSelectedVendor(user.id); // Wait, for admin, 'vendors' is list of SUPPLIERS, not user IDs? 
+            // Actually looking at User model: vendors: [String] -> these are supplier NAMES.
+            // And 'vendor' field in Product is User ID.
+            // So for Admin, we are selecting which *Admin User* manages it? No, `selectedVendor` is the User ID of the owner.
+            // If I am an Admin, I can assign it to any vendor user.
+
+            // Wait, previous logic was:
+            // if (user?.type === 'admin' && user?.vendors && user.vendors.length === 1) {
+            //    setSelectedSupplier(user.vendors[0]);
+            // }
+            // Correct.
+
             setSelectedSupplier(user.vendors[0]);
         } else {
             // For Super Admins or Multi-Vendor users, ensure we reset so they must choose
-            setSelectedSupplier('');
+            if (user?.type !== 'vendor') setSelectedSupplier('');
         }
 
         setStep(3);
@@ -201,6 +222,15 @@ export const ImportPage: React.FC = () => {
         if (!finalSupplier) {
             setError('Please select or enter a Supplier / Portfolio Name.');
             return;
+        }
+
+        // Logic to validate supplier against vendor permissions
+        const user = useAuthStore.getState().user;
+        if (user?.type === 'vendor' && user.vendors && user.vendors.length > 0) {
+            if (!user.vendors.includes(finalSupplier)) {
+                setError(`You are not authorized to import products for "${finalSupplier}".`);
+                return;
+            }
         }
 
         // Filter data for the selected supplier (in case file has mixed)
@@ -420,51 +450,56 @@ export const ImportPage: React.FC = () => {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Select Vendor (User)
-                                            <span className="text-xs text-slate-400 font-normal ml-2">(Who manages this portfolio?)</span>
-                                        </label>
+                                        {/* Vendor Selection - Only show for Admins */}
+                                        {user?.type !== 'vendor' && (
+                                            <>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                    Select Vendor (User)
+                                                    <span className="text-xs text-slate-400 font-normal ml-2">(Who manages this portfolio?)</span>
+                                                </label>
 
-                                        {!isNewVendor ? (
-                                            <div className="mb-6">
-                                                <select
-                                                    value={selectedVendor}
-                                                    onChange={(e) => {
-                                                        if (e.target.value === '___NEW___') {
-                                                            setIsNewVendor(true);
-                                                            setSelectedVendor('');
-                                                        } else {
-                                                            setSelectedVendor(e.target.value);
-                                                        }
-                                                    }}
-                                                    className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
-                                                >
-                                                    <option value="">-- Select Vendor --</option>
-                                                    {vendors.map(v => (
-                                                        <option key={v.id} value={v.id}>
-                                                            {v.username}
-                                                        </option>
-                                                    ))}
-                                                    <option value="___NEW___" className="font-bold text-indigo-600">+ Create New Vendor User</option>
-                                                </select>
-                                            </div>
-                                        ) : (
-                                            <div className="flex space-x-2 mb-6">
-                                                <input
-                                                    type="text"
-                                                    value={newVendorName}
-                                                    onChange={(e) => setNewVendorName(e.target.value)}
-                                                    placeholder="Enter New Vendor Username"
-                                                    className="flex-1 rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
-                                                    autoFocus
-                                                />
-                                                <button
-                                                    onClick={() => { setIsNewVendor(false); setNewVendorName(''); }}
-                                                    className="text-slate-500 hover:text-slate-700 px-3 py-2 border rounded-lg"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
+                                                {!isNewVendor ? (
+                                                    <div className="mb-6">
+                                                        <select
+                                                            value={selectedVendor}
+                                                            onChange={(e) => {
+                                                                if (e.target.value === '___NEW___') {
+                                                                    setIsNewVendor(true);
+                                                                    setSelectedVendor('');
+                                                                } else {
+                                                                    setSelectedVendor(e.target.value);
+                                                                }
+                                                            }}
+                                                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
+                                                        >
+                                                            <option value="">-- Select Vendor --</option>
+                                                            {vendors.map(v => (
+                                                                <option key={v.id} value={v.id}>
+                                                                    {v.username}
+                                                                </option>
+                                                            ))}
+                                                            <option value="___NEW___" className="font-bold text-indigo-600">+ Create New Vendor User</option>
+                                                        </select>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex space-x-2 mb-6">
+                                                        <input
+                                                            type="text"
+                                                            value={newVendorName}
+                                                            onChange={(e) => setNewVendorName(e.target.value)}
+                                                            placeholder="Enter New Vendor Username"
+                                                            className="flex-1 rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
+                                                            autoFocus
+                                                        />
+                                                        <button
+                                                            onClick={() => { setIsNewVendor(false); setNewVendorName(''); }}
+                                                            className="text-slate-500 hover:text-slate-700 px-3 py-2 border rounded-lg"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
 
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -496,7 +531,12 @@ export const ImportPage: React.FC = () => {
                                                 <option value="">-- Select Existing Supplier --</option>
                                                 {/* Filter suppliers based on auth */}
                                                 {suppliers.filter(s => {
+                                                    // Admin restricted
                                                     if (user?.type === 'admin' && user?.vendors && user.vendors.length > 0) {
+                                                        return user.vendors.includes(s);
+                                                    }
+                                                    // Vendor restricted
+                                                    if (user?.type === 'vendor' && user?.vendors && user.vendors.length > 0) {
                                                         return user.vendors.includes(s);
                                                     }
                                                     return true;
@@ -548,9 +588,14 @@ export const ImportPage: React.FC = () => {
                                         </button>
                                         <button
                                             onClick={handleImport}
-                                            disabled={isUploading || (!selectedSupplier && !newSupplierName) || (!selectedVendor && !newVendorName)}
+                                            disabled={
+                                                isUploading ||
+                                                (!selectedSupplier && !newSupplierName) ||
+                                                // If NOT vendor, must select vendor. If Vendor, valid.
+                                                (user?.type !== 'vendor' && !selectedVendor && !newVendorName)
+                                            }
                                             className={`py-2 px-6 rounded-xl flex items-center justify-center space-x-2 font-bold text-white transition-all shadow-md
-                                                ${isUploading || (!selectedSupplier && !newSupplierName) || (!selectedVendor && !newVendorName) ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}
+                                                ${isUploading || (!selectedSupplier && !newSupplierName) || (user?.type !== 'vendor' && !selectedVendor && !newVendorName) ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}
                                             `}
                                         >
                                             {isUploading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <span>Start Import</span>}

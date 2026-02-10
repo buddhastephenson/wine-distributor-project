@@ -5,7 +5,7 @@ const UserSchema: Schema = new Schema({
     id: { type: String, required: true, unique: true }, // custom ID
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    type: { type: String, enum: ['admin', 'customer'], default: 'customer' },
+    type: { type: String, enum: ['admin', 'customer', 'vendor'], default: 'customer' },
     isSuperAdmin: { type: Boolean, default: false },
     vendors: { type: [String], default: [] },
     email: { type: String, required: true, unique: true },

@@ -6,6 +6,7 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { AdminLayout } from './components/layouts/AdminLayout';
 import { CustomerLayout } from './components/layouts/CustomerLayout';
+import { VendorLayout } from './components/layouts/VendorLayout';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { UsersPage } from './pages/admin/UsersPage';
 import { CatalogPage } from './pages/catalog/CatalogPage';
@@ -36,6 +37,10 @@ const RootRedirect: React.FC = () => {
 
     if (user?.type === 'admin') {
         return <Navigate to="/admin" replace />;
+    }
+
+    if (user?.type === 'vendor') {
+        return <Navigate to="/vendor" replace />;
     }
 
     return <Navigate to="/catalog" replace />;
@@ -76,6 +81,24 @@ const App: React.FC = () => {
                                     <Route path="*" element={<Navigate to="/admin" replace />} />
                                 </Routes>
                             </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* Vendor Routes */}
+                <Route
+                    path="/vendor/*"
+                    element={
+                        <ProtectedRoute roles={['vendor']}>
+                            <VendorLayout>
+                                <Routes>
+                                    <Route path="/" element={<Navigate to="/vendor/products" replace />} />
+                                    {/* Vendors see their own catalog subset */}
+                                    <Route path="/products" element={<CatalogPage />} />
+                                    <Route path="/upload" element={<ImportPage />} />
+                                    <Route path="*" element={<Navigate to="/vendor" replace />} />
+                                </Routes>
+                            </VendorLayout>
                         </ProtectedRoute>
                     }
                 />

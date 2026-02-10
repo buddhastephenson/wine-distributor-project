@@ -18,6 +18,7 @@ const ProductSchema: Schema = new Schema({
     grapeVariety: { type: String, default: '' },
     extendedData: { type: Schema.Types.Mixed, default: {} },
     supplier: { type: String, default: '' },
+    vendor: { type: Schema.Types.ObjectId, ref: 'User' },
     uploadDate: { type: Date, default: Date.now }
 }, {
     timestamps: true,

@@ -15,6 +15,9 @@ class ProductService {
         if (user && user.type === 'admin' && user.vendors && user.vendors.length > 0) {
             // Only show products where supplier is in their allowed list
             query.supplier = { $in: user.vendors };
+        } else if (user && user.type === 'vendor') {
+            // Vendors only see products they own
+            query.vendor = user.id;
         }
 
         // Note: Customers and SuperAdmins (or admins with no vendors assigned) see everything.
