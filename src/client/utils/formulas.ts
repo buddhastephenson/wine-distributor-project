@@ -67,3 +67,22 @@ export const calculateFrontlinePrice = (product: IProduct, formulas: IFormulas) 
         formulaUsed: productType.includes('spirit') ? 'spirits' : productType.includes('non-alc') || productType.includes('non alc') ? 'nonAlcoholic' : 'wine'
     };
 };
+
+export const parseVolumeToMl = (size: string | undefined): number | null => {
+    if (!size) return null;
+    const clean = size.toString().toLowerCase().trim().replace(/,/g, '');
+
+    if (clean.endsWith('ml')) {
+        return parseFloat(clean.replace('ml', ''));
+    }
+    if (clean.endsWith('l') || clean.endsWith('ltr') || clean.endsWith('liter')) {
+        return parseFloat(clean.replace(/l|tr|iter/, '')) * 1000;
+    }
+
+    const val = parseFloat(clean);
+    if (!isNaN(val)) {
+        return val < 50 ? val * 1000 : val;
+    }
+
+    return null;
+};

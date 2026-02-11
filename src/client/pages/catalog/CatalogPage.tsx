@@ -6,7 +6,7 @@ import { TaxonomySidebar } from '../../components/catalog/TaxonomySidebar';
 import { ProductGrid } from '../../components/catalog/ProductGrid';
 import { ProductEditModal } from '../../components/catalog/ProductEditModal';
 import { LayoutGrid, List, CheckCircle, Download, Plus } from 'lucide-react';
-import { calculateFrontlinePrice } from '../../utils/formulas';
+import { calculateFrontlinePrice, parseVolumeToMl } from '../../utils/formulas';
 import { exportProductsToExcel } from '../../utils/export';
 import { IProduct } from '../../../shared/types';
 
@@ -18,7 +18,8 @@ export const CatalogPage: React.FC = () => {
     const [selectedRegion, setSelectedRegion] = useState('all');
     const [selectedAppellation, setSelectedAppellation] = useState('all');
     const [selectedSupplier, setSelectedSupplier] = useState('all');
-    const [selectedSize, setSelectedSize] = useState('all');
+    const [minSize, setMinSize] = useState<number | ''>('');
+    const [maxSize, setMaxSize] = useState<number | ''>('');
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [editingProduct, setEditingProduct] = useState<IProduct | null>(null);
@@ -87,7 +88,15 @@ export const CatalogPage: React.FC = () => {
             if (selectedRegion !== 'all' && product.region !== selectedRegion) return false;
             if (selectedAppellation !== 'all' && product.appellation !== selectedAppellation) return false;
             if (selectedSupplier !== 'all' && product.supplier !== selectedSupplier) return false;
-            if (selectedSize !== 'all' && product.bottleSize !== selectedSize) return false;
+            if (selectedSupplier !== 'all' && product.supplier !== selectedSupplier) return false;
+
+            // Bottle Size Range Check
+            if (minSize !== '' || maxSize !== '') {
+                const ml = parseVolumeToMl(product.bottleSize);
+                if (ml === null) return false; // Exclude unparsable sizes if filter is active? Or maybe include? Let's exclude.
+                if (minSize !== '' && ml < minSize) return false;
+                if (maxSize !== '' && ml > maxSize) return false;
+            }
 
             // Price Range
             if (formulas) {
@@ -115,12 +124,11 @@ export const CatalogPage: React.FC = () => {
             };
             return getRank(a.bottleSize) - getRank(b.bottleSize);
         });
-    }, [allowedProducts, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, selectedSize, priceRange, formulas]);
+    }, [allowedProducts, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, minSize, maxSize, priceRange, formulas]);
 
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const handleAddProduct = async (product: any, pricing: any) => {
-        // Data Sanitization for weird import artifacts
         let validItemCode = product.itemCode;
         let validProductName = product.productName;
 
@@ -183,7 +191,8 @@ export const CatalogPage: React.FC = () => {
         setSelectedRegion('all');
         setSelectedAppellation('all');
         setSelectedSupplier('all');
-        setSelectedSize('all');
+        setMinSize('');
+        setMaxSize('');
         setPriceRange([0, 10000]);
     };
 
@@ -216,12 +225,46 @@ export const CatalogPage: React.FC = () => {
     };
 
     const handleExport = () => {
-        const productsWithPricing = filteredProducts.map(p => {
-            if (!formulas) return p;
-            const pricing = calculateFrontlinePrice(p, formulas);
-            return { ...p, ...pricing };
+        const exportData = filteredProducts.map(p => {
+            let pricing = {};
+            if (formulas) {
+                pricing = calculateFrontlinePrice(p, formulas);
+            }
+            const combined = { ...p, ...pricing } as any;
+
+            // Base Export Object
+            const exportItem: any = {
+                'Item Code': combined.itemCode || '',
+                'Product Name': combined.productName || '',
+                'Producer': combined.producer || '',
+                'Vintage': combined.vintage || '',
+                'Bottle Size': combined.bottleSize || '',
+                'Pack Size': combined.packSize || '',
+                'Country': combined.country || '',
+                'Region': combined.region || '',
+                'Appellation': combined.appellation || '',
+                'Supplier': combined.supplier || '',
+                'Type': combined.productType || '',
+                'Frontline Bottle': combined.frontlinePrice || '',
+                'Frontline Case': combined.frontlineCase || '',
+                'SRP': combined.srp || '',
+                'Wholesale Bottle': combined.whlsBottle || '',
+            };
+
+            // Admin Only Columns
+            if (user?.type === 'admin') {
+                exportItem['FOB Case'] = combined.fobCasePrice || '';
+                exportItem['Laid In'] = combined.laidIn || '';
+                exportItem['Wholesale Case'] = combined.whlsCase || '';
+                exportItem['Bank Fee'] = combined.bankFee || '';
+                exportItem['Landing Cost'] = combined.landingCost || '';
+                exportItem['Profit'] = combined.profit || '';
+                exportItem['Margin'] = combined.margin || '';
+            }
+
+            return exportItem;
         });
-        exportProductsToExcel(productsWithPricing, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportProductsToExcel(exportData, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const handleEditProduct = (product: IProduct) => {
@@ -273,8 +316,10 @@ export const CatalogPage: React.FC = () => {
                 setSelectedAppellation={setSelectedAppellation}
                 selectedSupplier={selectedSupplier}
                 setSelectedSupplier={setSelectedSupplier}
-                selectedBottleSize={selectedSize}
-                setSelectedBottleSize={setSelectedSize}
+                minSize={minSize}
+                setMinSize={setMinSize}
+                maxSize={maxSize}
+                setMaxSize={setMaxSize}
                 priceRange={priceRange}
                 setPriceRange={setPriceRange}
                 uniqueCountries={uniqueCountries}

@@ -19,8 +19,10 @@ interface TaxonomySidebarProps {
     uniqueAppellations: string[];
     suppliers: string[];
     bottleSizes: string[];
-    selectedBottleSize: string;
-    setSelectedBottleSize: (size: string) => void;
+    minSize: number | '';
+    setMinSize: (size: number | '') => void;
+    maxSize: number | '';
+    setMaxSize: (size: number | '') => void;
     resetFilters: () => void;
 }
 
@@ -42,8 +44,10 @@ export const TaxonomySidebar: React.FC<TaxonomySidebarProps> = ({
     uniqueAppellations,
     suppliers,
     bottleSizes,
-    selectedBottleSize,
-    setSelectedBottleSize,
+    minSize,
+    setMinSize,
+    maxSize,
+    setMaxSize,
     resetFilters,
 }) => {
     return (
@@ -119,18 +123,25 @@ export const TaxonomySidebar: React.FC<TaxonomySidebarProps> = ({
                     </div>
                 </div>
 
-                <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Bottle Size</label>
-                    <div className="relative">
-                        <select
-                            value={selectedBottleSize}
-                            onChange={(e) => setSelectedBottleSize(e.target.value)}
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-bold text-xs appearance-none cursor-pointer pr-8 text-slate-700 dark:text-slate-200 truncate"
-                        >
-                            <option value="all">All Sizes</option>
-                            {bottleSizes.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                <div className="space-y-1.5 md:col-span-2 lg:col-span-1">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Bottle Size (mL)</label>
+                    <div className="flex space-x-2">
+                        <input
+                            type="number"
+                            min="0"
+                            value={minSize}
+                            onChange={(e) => setMinSize(e.target.value ? parseInt(e.target.value) : '')}
+                            placeholder="Min mL"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-bold text-xs text-slate-700 dark:text-slate-200"
+                        />
+                        <input
+                            type="number"
+                            min="0"
+                            value={maxSize}
+                            onChange={(e) => setMaxSize(e.target.value ? parseInt(e.target.value) : '')}
+                            placeholder="Max mL"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/10 focus:border-rose-500/50 transition-all font-bold text-xs text-slate-700 dark:text-slate-200"
+                        />
                     </div>
                 </div>
             </div>

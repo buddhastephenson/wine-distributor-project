@@ -41,26 +41,7 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
     XLSX.writeFile(workbook, filename);
 };
 
-export const exportProductsToExcel = (products: any[], filename: string = 'products.xlsx') => {
-    const data = products.map(product => ({
-        'Item Code': product.itemCode || '',
-        'Product Name': product.productName || '',
-        'Producer': product.producer || '',
-        'Vintage': product.vintage || '',
-        'Bottle Size': product.bottleSize || '',
-        'Pack Size': product.packSize || '',
-        'Country': product.country || '',
-        'Region': product.region || '',
-        'Appellation': product.appellation || '',
-        'Supplier': product.supplier || '',
-        'Type': product.productType || '',
-        'FOB Case': product.fobCasePrice || 0,
-        'Frontline Case': (parseFloat(product.frontlinePrice || '0') * parseInt(product.packSize || '12')).toFixed(2),
-        'Laid In': product.laidInCost || 0,
-        'Wholesale Case': product.wholesalePrice || 0,
-        'Status': product.status || 'Active'
-    }));
-
+export const exportProductsToExcel = (data: any[], filename: string = 'products.xlsx') => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Catalog");
