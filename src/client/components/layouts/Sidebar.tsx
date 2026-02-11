@@ -40,6 +40,10 @@ export const Sidebar: React.FC = () => {
                     {user?.type === 'vendor' ? 'Vendor Portal (v2)' : 'AOC Admin'}
                 </Link>
             </div>
+            {/* DEBUG BANNER */}
+            <div className="bg-red-600 text-white text-xs p-1 text-center font-mono">
+                DEBUG V3: Role={user?.type || 'none'}
+            </div>
             <nav className="flex-1 overflow-y-auto py-4">
                 <ul className="space-y-1">
                     {navItems.map((item) => (
