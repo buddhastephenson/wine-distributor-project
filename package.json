@@ -28,10 +28,10 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "node dist/server/app.js",
+    "start": "node dist/server/server/app.js",
     "dev": "concurrently \"react-scripts start\" \"PORT=3002 TS_NODE_TRANSPILE_ONLY=true nodemon src/server/app.ts\"",
     "build:server": "tsc -p src/server",
-    "start:server": "node dist/server/app.js",
+    "start:server": "node dist/server/server/app.js",
     "server": "TS_NODE_TRANSPILE_ONLY=true nodemon src/server/app.ts",
     "client": "react-scripts start",
     "predeploy": "npm run build",
