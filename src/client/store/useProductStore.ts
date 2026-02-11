@@ -11,7 +11,7 @@ interface ProductState {
 
     fetchProducts: () => Promise<void>;
     fetchSpecialOrders: (username?: string) => Promise<void>;
-    addSpecialOrder: (order: Partial<ISpecialOrder>) => Promise<void>;
+    addSpecialOrder: (order: Partial<ISpecialOrder>) => Promise<ISpecialOrder | null>;
     updateSpecialOrder: (id: string, updates: Partial<ISpecialOrder>) => Promise<void>;
     deleteSpecialOrder: (id: string) => Promise<void>;
     bulkDeleteSpecialOrders: (ids: string[]) => Promise<void>;
@@ -60,10 +60,13 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 set((state) => ({
                     specialOrders: [...state.specialOrders, response.data.order]
                 }));
+                return response.data.order;
             }
+            return null;
         } catch (error: any) {
             console.error('Add Special Order Failed:', error.response?.data || error.message);
             set({ error: 'Failed to add to list' });
+            return null;
         }
     },
 

@@ -102,6 +102,22 @@ export const OrdersPage: React.FC = () => {
             setSuccessMessage(location.state.successMessage);
             window.history.replaceState({}, document.title);
         }
+        if (location.state?.highlightOrderId) {
+            // Include a small delay to ensure rendering
+            setTimeout(() => {
+                const element = document.getElementById(`order-${location.state.highlightOrderId}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    element.classList.add('ring-2', 'ring-rose-500', 'ring-offset-2');
+                    setTimeout(() => element.classList.remove('ring-2', 'ring-rose-500', 'ring-offset-2'), 3000);
+                }
+            }, 500);
+            // Clear state to prevent scrolling on refresh - care needed not to wipe successMessage if present
+            // simplistic approach: just clear highlightOrderId
+            const state = { ...location.state };
+            delete state.highlightOrderId;
+            window.history.replaceState(state, document.title);
+        }
     }, [location]);
 
     const handleSubmitRequest = async () => {
@@ -112,7 +128,10 @@ export const OrdersPage: React.FC = () => {
         window.scrollTo(0, 0);
     };
 
-    const handleUpdateRequest = () => {
+    const handleUpdateRequest = async () => {
+        for (const order of displayedSubmitted) {
+            await updateSpecialOrder(order.id, { adminUnseen: true });
+        }
         setSuccessMessage('Request Updated! Your rep has been notified of changes.');
         window.scrollTo(0, 0);
     };
@@ -297,7 +316,6 @@ export const OrdersPage: React.FC = () => {
                                     >
                                         <CheckCircle className="w-4 h-4" />
                                         <span>Submit Request</span>
-                                        <span>Submit Request</span>
                                     </button>
                                 )}
                                 {user?.type === 'admin' && selectedCustomer && displayedPending.length > 0 && (
@@ -330,6 +348,15 @@ export const OrdersPage: React.FC = () => {
                             <div className="space-y-6 pt-8 border-t border-slate-100">
                                 <div className="flex justify-between items-end px-2">
                                     <h3 className="text-xl font-bold text-slate-800 dark:text-white">Request History</h3>
+                                    {user?.type !== 'admin' && (
+                                        <button
+                                            onClick={handleUpdateRequest}
+                                            className="bg-[#1a1a1a] dark:bg-rose-600 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-slate-800 dark:hover:bg-rose-700 transition-all shadow-lg flex items-center space-x-2"
+                                        >
+                                            <CheckCircle className="w-4 h-4" />
+                                            <span>Update Request</span>
+                                        </button>
+                                    )}
                                 </div>
                                 <OrderList
                                     orders={displayedSubmitted}

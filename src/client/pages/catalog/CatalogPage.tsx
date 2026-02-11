@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { TaxonomySidebar } from '../../components/catalog/TaxonomySidebar';
@@ -22,6 +23,7 @@ export const CatalogPage: React.FC = () => {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [editingProduct, setEditingProduct] = useState<IProduct | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const navigate = useNavigate();
 
     // Fetch Data on Mount
     useEffect(() => {
@@ -160,15 +162,19 @@ export const CatalogPage: React.FC = () => {
             productLink: product.productLink,
             cases: 1,
             bottles: 0,
-            status: 'pending',
+            status: 'Pending',
             submitted: false,
             username: user?.username || 'Guest'
         };
         console.log('Adding Special Order Payload:', payload);
 
-        await addSpecialOrder(payload);
-        setSuccessMessage(`Added ${validProductName} to your list.`);
-        window.scrollTo(0, 0);
+        const newOrder = await addSpecialOrder(payload);
+        if (newOrder) {
+            navigate('/orders', { state: { highlightOrderId: newOrder.id } });
+        } else {
+            setSuccessMessage(`Added ${validProductName} to your list.`);
+            window.scrollTo(0, 0);
+        }
     };
 
     const resetFilters = () => {

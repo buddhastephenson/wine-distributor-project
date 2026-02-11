@@ -1,6 +1,6 @@
 import React from 'react';
 import { ISpecialOrder, IUser, ORDER_STATUS } from '../../../shared/types';
-import { X, Check } from 'lucide-react';
+import { Check, Trash2, X } from 'lucide-react';
 import { OrderChat } from './OrderChat';
 import { v4 as uuidv4 } from 'uuid'; // You might need to install this or use a simple generator
 
@@ -53,7 +53,7 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
     return (
         <div className="space-y-4">
             {orders.map(item => (
-                <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 hover:shadow-md transition-all duration-200">
+                <div key={item.id} id={`order-${item.id}`} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 hover:shadow-md transition-all duration-200">
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex-1 pr-4">
                             <div className="flex items-center space-x-2 mb-1">
@@ -78,14 +78,15 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                         </div>
                         {!isReadOnly && (
                             currentUser?.type === 'admin' ||
-                            (!item.submitted && item.status === 'Pending')
+                            !item.submitted ||
+                            (item.status || '').toLowerCase() === 'pending'
                         ) && (
                                 <button
                                     onClick={() => onDelete(item.id)}
-                                    className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                    className="p-2 bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-800 rounded-full transition-colors flex items-center justify-center shrink-0 z-10"
                                     title="Remove Item"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-5 h-5 pointer-events-none" />
                                 </button>
                             )}
                     </div>
@@ -129,7 +130,7 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                                 <select
                                     value={item.status || ORDER_STATUS.PENDING}
                                     onChange={(e) => onUpdate(item.id, { status: e.target.value, hasUnseenUpdate: true })}
-                                    className={`appearance-none text-[10px] font-black uppercase tracking-widest px-3 py-1 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/20 ${(item.status || 'Pending').includes('Pending') ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                                    className={`appearance-none text-[10px] font-black uppercase tracking-widest px-3 py-1 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/20 ${((item.status || 'Pending').toLowerCase().includes('pending')) ? 'bg-slate-50 text-slate-400 border-slate-100' :
                                         (item.status || '').includes('On Purchase Order') ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                             (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                 (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
@@ -151,7 +152,7 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                                 </div>
                             </div>
                         ) : (
-                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${(item.status || 'Pending').includes('Pending') ? 'bg-slate-50 text-slate-400 border-slate-100' :
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${((item.status || 'Pending').toLowerCase().includes('pending')) ? 'bg-slate-50 text-slate-400 border-slate-100' :
                                 (item.status || '').includes('On Purchase Order') ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                     (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                         (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
