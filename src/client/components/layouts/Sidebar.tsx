@@ -37,12 +37,7 @@ export const Sidebar: React.FC = () => {
         <div className="flex flex-col w-64 bg-gray-900 h-screen text-white transition-all duration-300">
             <div className="flex items-center justify-center h-16 border-b border-gray-800">
                 <Link to={user?.type === 'vendor' ? '/vendor' : '/admin'} className="text-xl font-bold hover:text-indigo-400 transition-colors">
-                    {user?.type === 'vendor' ? 'Vendor Portal (v2)' : 'AOC Admin'}
                 </Link>
-            </div>
-            {/* DEBUG BANNER */}
-            <div className="bg-red-600 text-white text-xs p-1 text-center font-mono">
-                DEBUG V3: Role={user?.type || 'none'}
             </div>
             <nav className="flex-1 overflow-y-auto py-4">
                 <ul className="space-y-1">
