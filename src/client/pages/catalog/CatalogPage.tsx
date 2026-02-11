@@ -268,11 +268,13 @@ export const CatalogPage: React.FC = () => {
     };
 
     const handleEditProduct = (product: IProduct) => {
-        // Permission Check (Frontend optimization, authentic check is on backend)
-        if (user?.type !== 'admin') return;
+        // Permission Check
+        const isAuthorized = user?.type === 'admin' || user?.type === 'vendor';
+        if (!isAuthorized) return;
 
         // Vendor Check
-        if (user.vendors && user.vendors.length > 0) {
+        if (user?.type === 'vendor' && user.vendors && user.vendors.length > 0) {
+            // Vendors can only edit their own products
             if (!product.supplier || !user.vendors.includes(product.supplier)) {
                 alert("You can only edit products from your assigned suppliers.");
                 return;
@@ -289,9 +291,11 @@ export const CatalogPage: React.FC = () => {
     };
 
     const handleSaveEdit = () => {
-        fetchProducts(); // Refresh list
+        fetchProducts(); // Refresh list to get updated data and recalculate prices
         setSuccessMessage(`Product updated successfully.`);
     };
+
+    const canEdit = user?.type === 'admin' || user?.type === 'vendor';
 
     return (
         <div className="space-y-6 animate-fade-in-up">
@@ -345,6 +349,7 @@ export const CatalogPage: React.FC = () => {
                     Viewing {filteredProducts.length} Products
                 </h2>
                 <div className="flex items-center space-x-4">
+                    {/* Add Product: Only Admin (Super/Rep) - Vendors typically import? Or can add? User didn't specify add, just "edit individual". Let's restrict Add to Admin for now unless specified. */}
                     {user?.type === 'admin' && (
                         <button
                             onClick={handleAddNewProduct}
@@ -384,9 +389,9 @@ export const CatalogPage: React.FC = () => {
                 products={filteredProducts}
                 formulas={formulas}
                 onAdd={handleAddProduct}
-                onEdit={user?.type === 'admin' ? handleEditProduct : undefined}
+                onEdit={canEdit ? handleEditProduct : undefined}
                 viewMode={viewMode}
-                isAdmin={user?.type === 'admin'}
+                isAdmin={canEdit} // Controls seeing FOB, which editors need
             />
         </div>
     );

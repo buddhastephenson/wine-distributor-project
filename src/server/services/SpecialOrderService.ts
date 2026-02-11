@@ -4,7 +4,7 @@ import { ISpecialOrder, IUser } from '../../shared/types';
 class SpecialOrderService {
     async getAllSpecialOrders(user?: IUser): Promise<ISpecialOrder[]> {
         let query: any = {};
-        if (user && user.type === 'admin' && user.vendors && user.vendors.length > 0) {
+        if (user && (user.type === 'admin' || user.type === 'vendor') && user.vendors && user.vendors.length > 0) {
             query.supplier = { $in: user.vendors };
         }
         return await SpecialOrder.find(query, '-_id -__v -createdAt -updatedAt').lean();
@@ -12,7 +12,7 @@ class SpecialOrderService {
 
     async getSpecialOrdersByUsername(username: string, user?: IUser): Promise<ISpecialOrder[]> {
         let query: any = { username };
-        if (user && user.type === 'admin' && user.vendors && user.vendors.length > 0) {
+        if (user && (user.type === 'admin' || user.type === 'vendor') && user.vendors && user.vendors.length > 0) {
             query.supplier = { $in: user.vendors };
         }
         return await SpecialOrder.find(query, '-_id -__v -createdAt -updatedAt').lean();

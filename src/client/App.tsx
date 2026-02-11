@@ -96,6 +96,7 @@ const App: React.FC = () => {
                                     {/* Vendors see their own catalog subset */}
                                     <Route path="/products" element={<CatalogPage />} />
                                     <Route path="/upload" element={<ImportPage />} />
+                                    <Route path="/orders" element={<OrdersPage />} />
                                     <Route path="*" element={<Navigate to="/vendor" replace />} />
                                 </Routes>
                             </VendorLayout>

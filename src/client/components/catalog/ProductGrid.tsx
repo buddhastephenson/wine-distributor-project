@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
 import { IProduct, IFormulas } from '../../../shared/types';
 import { ProductCard } from './ProductCard';
 import { calculateFrontlinePrice } from '../../utils/formulas';
@@ -95,7 +95,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                                             </span>
                                         </td>
                                     )}
-                                    <td className="py-4 px-8 text-center">
+                                    <td className="py-4 px-8 text-center flex items-center justify-end space-x-2">
                                         <button
                                             onClick={() => onAdd(product, calc)}
                                             className="p-2.5 bg-slate-900 dark:bg-rose-600 text-white rounded-xl hover:bg-rose-600 dark:hover:bg-rose-700 transition-all shadow-sm active:scale-90"
@@ -103,6 +103,15 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>
+                                        {isAdmin && onEdit && (
+                                            <button
+                                                onClick={() => onEdit(product)}
+                                                className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm active:scale-90"
+                                                title={`Edit Product${product.lastEditedBy ? ` (Last edited by ${product.lastEditedBy})` : ''}`}
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             );

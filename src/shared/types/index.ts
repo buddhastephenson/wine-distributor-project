@@ -38,6 +38,8 @@ export interface IProduct {
     formulaUsed?: string;
     grapeVariety?: string; // New: Imported from price list
     extendedData?: Record<string, string | number>; // New: Custom columns
+    lastEditedBy?: string;
+    lastEditedAt?: string | Date;
 }
 
 export const ORDER_STATUS = {
@@ -84,6 +86,7 @@ export interface ISpecialOrder {
     adminUnseen?: boolean; // For admin
     messages?: IOrderMessage[];
     createdAt?: string | Date; // Added for sorting
+    impersonatedBy?: string;
 }
 
 export interface IOrderMessage {

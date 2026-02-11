@@ -38,7 +38,8 @@ const SpecialOrderSchema: Schema = new Schema({
         sender: String,
         timestamp: Date,
         isAdmin: Boolean
-    }]
+    }],
+    impersonatedBy: { type: String } // Username of the admin/rep who placed/updated this order
 }, {
     timestamps: true
 });

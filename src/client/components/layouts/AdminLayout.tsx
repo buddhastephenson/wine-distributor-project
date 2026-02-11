@@ -17,7 +17,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <header className="bg-white shadow">
                     <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
                         <Link to="/admin">
-                            <h1 className="text-2xl font-bold text-gray-900 hover:text-indigo-600 transition-colors cursor-pointer">Admin Dashboard</h1>
+                            <h1 className="text-2xl font-bold text-gray-900 hover:text-indigo-600 transition-colors cursor-pointer">
+                                {useAuthStore.getState().user?.isSuperAdmin ? 'Admin Dashboard' : 'Rep Dashboard'}
+                            </h1>
                         </Link>
                         <div className="flex items-center space-x-4">
                             {useAuthStore.getState().originalUser && (
@@ -33,7 +35,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                             )}
                             <div className="flex items-center space-x-3">
                                 <span className="text-sm font-medium text-gray-700">
-                                    {useAuthStore.getState().user?.username || 'Admin User'}
+                                    {useAuthStore.getState().user?.username || (useAuthStore.getState().user?.isSuperAdmin ? 'Admin User' : 'Rep User')}
                                 </span>
                                 <button
                                     onClick={() => {

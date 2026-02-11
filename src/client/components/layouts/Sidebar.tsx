@@ -14,20 +14,23 @@ export const Sidebar: React.FC = () => {
     const isVendor = user?.type === 'vendor';
 
     const navItems = [
-        // Dashboard: Admin gets /admin, Vendor gets /vendor
+        // Dashboard: Admin (Rep/Super) gets /admin, Vendor gets /vendor
         { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: isVendor ? '/vendor' : '/admin' },
 
-        // Products: Admin gets /admin/products, Vendor gets /vendor/products
+        // Products: Admin (Rep/Super) gets /admin/products, Vendor gets /vendor/products
         { name: 'Products', icon: <Package size={20} />, path: isVendor ? '/vendor/products' : '/admin/products' },
 
-        // Import: Admin (Super) or Vendor
-        ...((isSuperAdmin || isVendor) ? [{ name: 'Import', icon: <Upload size={20} />, path: isVendor ? '/vendor/upload' : '/admin/import' }] : []),
+        // Import: Admin (Super) or Vendor. Reps (Admin type but not super) can also import? 
+        // User didn't explicitly forbid Reps from importing, just said "Exceptions of (a) access to Settings ... (b) management of Users".
+        // So Reps can import.
+        { name: 'Import', icon: <Upload size={20} />, path: isVendor ? '/vendor/upload' : '/admin/import' },
 
-        // Users: Super Admin only
-        ...(isSuperAdmin && !isVendor ? [{ name: 'Users', icon: <Users size={20} />, path: '/admin/users' }] : []),
+        // Users: Admin (Rep/Super). Reps need this for Impersonation, even if they can't "manage" users.
+        ...(!isVendor ? [{ name: 'Users', icon: <Users size={20} />, path: '/admin/users' }] : []),
 
-        // Orders: Admin only (for now, unless vendors fulfill their own)
-        ...(!isVendor ? [{ name: 'Orders', icon: <FileText size={20} />, path: '/admin/orders' }] : []),
+        // Orders: Admin (Rep/Super) AND Vendor (scoped)
+        // Vendors should see orders now.
+        { name: 'Orders', icon: <FileText size={20} />, path: isVendor ? '/vendor/orders' : '/admin/orders' },
 
         // Settings: Super Admin only
         ...(isSuperAdmin && !isVendor ? [{ name: 'Settings', icon: <Settings size={20} />, path: '/admin/settings' }] : []),

@@ -95,7 +95,14 @@ class ProductController {
                 }
             }
 
-            const product = await ProductService.updateProduct(id as string, updates);
+            // Add tracking info
+            const updatesWithTracking = {
+                ...updates,
+                lastEditedBy: user?.username || 'System',
+                lastEditedAt: new Date()
+            };
+
+            const product = await ProductService.updateProduct(id as string, updatesWithTracking);
             if (!product) {
                 return res.status(404).json({ error: 'Product not found' });
             }

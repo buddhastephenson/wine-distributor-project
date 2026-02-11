@@ -54,7 +54,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
     addSpecialOrder: async (order) => {
         console.log('useProductStore.addSpecialOrder called with:', order);
         try {
-            const response = await specialOrderApi.create(order);
+            // Check for impersonation
+            // Dynamically import or access store to avoid circular deps if possible, 
+            // but here we can just import useAuthStore at top or access via window/global if complex.
+            // Actually, we can import useAuthStore. using getState() is safe inside actions.
+            const { originalUser } = require('./useAuthStore').useAuthStore.getState();
+
+            const payload = {
+                ...order,
+                impersonatedBy: originalUser ? originalUser.username : undefined
+            };
+
+            const response = await specialOrderApi.create(payload);
             console.log('addSpecialOrder success:', response.data);
             if (response.data.success) {
                 set((state) => ({

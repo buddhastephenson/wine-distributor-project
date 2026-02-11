@@ -46,6 +46,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                         </p>
                     )}
                 </div>
+                {product.lastEditedBy && (
+                    <p className="text-[9px] text-slate-300 dark:text-slate-600 font-bold uppercase tracking-wide mb-2">
+                        Last Edited by {product.lastEditedBy} on {new Date(product.lastEditedAt || '').toLocaleDateString()}
+                    </p>
+                )}
                 {product.appellation && (
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold italic uppercase tracking-tighter mb-2">
                         {product.appellation}

@@ -19,6 +19,8 @@ const ProductSchema: Schema = new Schema({
     extendedData: { type: Schema.Types.Mixed, default: {} },
     supplier: { type: String, default: '' },
     vendor: { type: String, ref: 'User' },
+    lastEditedBy: { type: String },
+    lastEditedAt: { type: Date },
     uploadDate: { type: Date, default: Date.now }
 }, {
     timestamps: true,
