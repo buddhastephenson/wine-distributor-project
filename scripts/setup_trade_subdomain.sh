@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Subdomain Setup Script for wishlist.aocwinecompany.com
-DOMAIN="wishlist.aocwinecompany.com"
+# Subdomain Setup Script for trade.aocwinecompany.com
+DOMAIN="trade.aocwinecompany.com"
 APP_PORT=3001
 
 echo "----------------------------------------------------------------"
@@ -10,7 +10,7 @@ echo "----------------------------------------------------------------"
 
 # 1. Create Nginx Config
 echo "Creating Nginx configuration file..."
-sudo tee /etc/nginx/sites-available/wishlist > /dev/null <<EOF
+sudo tee /etc/nginx/sites-available/trade > /dev/null <<EOF
 server {
     listen 80;
     server_name $DOMAIN;
@@ -28,7 +28,7 @@ EOF
 
 # 2. Enable Site
 echo "Enabling the site..."
-sudo ln -sf /etc/nginx/sites-available/wishlist /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/trade /etc/nginx/sites-enabled/
 
 # 3. Test and Reload
 echo "Testing Nginx configuration..."
