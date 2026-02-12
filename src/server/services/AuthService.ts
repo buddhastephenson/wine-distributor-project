@@ -131,7 +131,8 @@ class AuthService {
             user.resetTokenExpiry = expiry;
             await user.save();
 
-            const resetLink = `http://localhost:3000/reset-password?token=${token}`; // TODO: Make base URL configurable
+            const baseUrl = process.env.PUBLIC_URL || 'https://trade.aocwinecompany.com';
+            const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
             const mailOptions = {
                 from: process.env.SMTP_FROM || '"AOC Wines" <noreply@aocwines.com>',
