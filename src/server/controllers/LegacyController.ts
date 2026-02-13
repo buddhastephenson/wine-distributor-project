@@ -77,6 +77,9 @@ class LegacyController {
     // POST /api/storage/:key
     async postStorage(req: Request, res: Response) {
         const key = req.params.key;
+        if (!req.body) {
+            return res.status(400).json({ error: 'Missing request body' });
+        }
         const { value } = req.body; // value is a JSON string
 
         try {
