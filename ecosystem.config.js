@@ -1,7 +1,7 @@
 module.exports = {
     apps: [{
-        name: "wine-distributor",
-        script: "./server.js",
+        name: "wine-app",
+        script: "./dist/server/server/app.js",
         env: {
             NODE_ENV: "production",
             PORT: 3001,

@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Force Restart Script
-# Use this to ensure the app is rebuilt and restarted correctly.
+# Force Restart Script (Updated)
+# Use this to ensure the app is rebuilt and restarted correctly with the right config.
 
 echo "----------------------------------------------------------------"
-echo "Stopping existing processes..."
-pm2 stop all
+echo "Stopping and deleting existing processes (to flush old config)..."
+pm2 delete all || true
 
 echo "----------------------------------------------------------------"
 echo "installing dependencies..."
@@ -16,8 +16,9 @@ echo "Rebuilding the application..."
 npm run build
 
 echo "----------------------------------------------------------------"
-echo "Starting application with PM2..."
-pm2 restart all --update-env
+echo "Starting application with PM2 (using ecosystem.config.js)..."
+pm2 start ecosystem.config.js
+pm2 save
 
 echo "----------------------------------------------------------------"
 echo "Waiting 5 seconds for startup..."
