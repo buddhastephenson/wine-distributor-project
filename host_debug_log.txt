@@ -1,1 +1,196 @@
-[PASTE DIGITALOCEAN REPLY HERE]
+[Hello Trey,
+
+Thanks for reaching out. We appreciate you sticking with us while we work through a backlog of requests. We are currently experiencing delays due to an unusually high volume of tickets. We are constantly working to improve our services and appreciate your patience in the meantime.
+
+We understand you have concerns regarding SMTP restrictions in place on your account. DigitalOcean is not a dedicated email host and stopping spam is a constant fight. Due to this, restrictions have been imposed on all accounts.
+
+We would also like to provide some additional background on this issue. Since IP addresses in cloud environments get used and released back to available pools very frequently, they are considered dynamic and untrustworthy. For example, you’re currently assigned an IP address and you're a responsible mail user. You follow all best practices for mail and never send spam or unsolicited mail. Later, when you no longer need that Droplet, you destroy it and the IP address is free to be assigned to another DigitalOcean user. That user takes the opportunity to send out a large volume of spam before our Security team takes action on the offending account.
+
+Mail providers like Gmail, Microsoft, and others cannot determine if email coming from an IP is legitimate or not until it gains a poor reputation. By that time, the damage had already been done. It's safer to just block all mail coming from platforms, like Internet Service Providers and Cloud hosting environments, where IP addresses are dynamically assigned and inherently risky.
+While this does reduce avenues that spammers have available to them, it also impacts legitimate users. Our Abuse Operations team is working with SBLs to get the IPs delisted. Due to this, we are restricting SMTP traffic across the DigitalOcean platform. This means that we are unable to remove the SMTP restriction that is placed on your account.
+
+We recommend utilizing alternative ports if your application allows, such as port 2525. You can also use REST API with sending services that support it, which allows you to send emails via HTTP requests instead of the traditional SMTP protocol if it is suitable for you.
+
+You can read more about our SMTP policy here:
+ https://docs.digitalocean.com/support/why-is-smtp-blocked/ 
+
+Please do not hesitate to contact us should you require any further information or assistance.
+
+Regards,
+Amad
+Associate Customer Advocate
+DigitalOcean SupportPASTE DIGITALOCEAN REPLY HERE]root@ubuntu-s-1vcpu-1gb-35gb-intel-atl1-01:~# 
+cd wine-distributor-project && git pull && npm install && npm run build && pm2 restart wine-app
+remote: Enumerating objects: 70, done.
+remote: Counting objects: 100% (70/70), done.
+remote: Compressing objects: 100% (11/11), done.
+remote: Total 42 (delta 27), reused 40 (delta 25), pack-reused 0 (from 0)
+Unpacking objects: 100% (42/42), 7.23 KiB | 352.00 KiB/s, done.
+From https://github.com/buddhastephenson/wine-distributor-project
+   1696e12..508159d  main       -> origin/main
+Updating 1696e12..508159d
+Fast-forward
+ host_debug_log.txt                        |   1 +
+ scripts/debug_env.sh                      |  42 +++++++++++++++++++++-
+ scripts/restore_trey.js                   |  72 ++++++++++++++++++++++++++++++++++++++
+ src/client/components/admin/UserTable.tsx |  86 +++++++++++++++++++++++++++++++++++++--------
+ src/client/pages/auth/SignupPage.tsx      | 120 ++++++++++++++++++++++++++++++++++++++-------------------------
+ src/client/services/api.ts                |   3 +-
+ src/client/store/useAuthStore.ts          |   9 +++--
+ src/server/controllers/UserController.ts  |  21 +++++++++--
+ src/server/models/User.ts                 |   1 +
+ src/server/routes/userRoutes.ts           |   3 ++
+ src/server/services/AuthService.ts        |  28 +++++++++++----
+ src/server/services/UserService.ts        |   4 +--
+ src/shared/types/index.ts                 |   2 ++
+ 13 files changed, 316 insertions(+), 76 deletions(-)
+ create mode 100644 host_debug_log.txt
+ create mode 100644 scripts/restore_trey.js
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: @babel/eslint-parser@7.28.6
+npm warn Found: eslint@10.0.0
+npm warn node_modules/eslint
+npm warn   dev eslint@"^10.0.0" from the root project
+npm warn   3 more (@eslint-community/eslint-utils, ...)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peer eslint@"^7.5.0 || ^8.0.0 || ^9.0.0" from @babel/eslint-parser@7.28.6
+npm warn node_modules/@babel/eslint-parser
+npm warn   @babel/eslint-parser@"^7.16.3" from eslint-config-react-app@7.0.1
+npm warn   node_modules/eslint-config-react-app
+npm warn
+npm warn Conflicting peer dependency: eslint@9.39.2
+npm warn node_modules/eslint
+npm warn   peer eslint@"^7.5.0 || ^8.0.0 || ^9.0.0" from @babel/eslint-parser@7.28.6
+npm warn   node_modules/@babel/eslint-parser
+npm warn     @babel/eslint-parser@"^7.16.3" from eslint-config-react-app@7.0.1
+npm warn     node_modules/eslint-config-react-app
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: @typescript-eslint/eslint-plugin@8.54.0
+npm error Found: eslint@10.0.0
+npm error node_modules/eslint
+npm error   dev eslint@"^10.0.0" from the root project
+npm error   peer eslint@"^6.0.0 || ^7.0.0 || >=8.0.0" from @eslint-community/eslint-utils@4.9.1
+npm error   node_modules/@eslint-community/eslint-utils
+npm error     @eslint-community/eslint-utils@"^4.9.1" from @typescript-eslint/utils@8.54.0
+npm error     node_modules/@typescript-eslint/eslint-plugin/node_modules/@typescript-eslint/utils
+npm error       @typescript-eslint/utils@"8.54.0" from @typescript-eslint/eslint-plugin@8.54.0
+npm error       node_modules/@typescript-eslint/eslint-plugin
+npm error         dev @typescript-eslint/eslint-plugin@"^8.54.0" from the root project
+npm error     @eslint-community/eslint-utils@"^4.9.1" from @typescript-eslint/utils@8.54.0
+npm error     node_modules/@typescript-eslint/type-utils/node_modules/@typescript-eslint/utils
+npm error       @typescript-eslint/utils@"8.54.0" from @typescript-eslint/type-utils@8.54.0
+npm error       node_modules/@typescript-eslint/type-utils
+npm error         @typescript-eslint/type-utils@"8.54.0" from @typescript-eslint/eslint-plugin@8.54.0
+npm error         node_modules/@typescript-eslint/eslint-plugin
+npm error     3 more (@typescript-eslint/utils, eslint, eslint)
+npm error   2 more (@typescript-eslint/type-utils, fork-ts-checker-webpack-plugin)
+npm error
+npm error Could not resolve dependency:
+npm error peer eslint@"^8.57.0 || ^9.0.0" from @typescript-eslint/eslint-plugin@8.54.0
+npm error node_modules/@typescript-eslint/eslint-plugin
+npm error   dev @typescript-eslint/eslint-plugin@"^8.54.0" from the root project
+npm error
+npm error Conflicting peer dependency: eslint@9.39.2
+npm error node_modules/eslint
+npm error   peer eslint@"^8.57.0 || ^9.0.0" from @typescript-eslint/eslint-plugin@8.54.0
+npm error   node_modules/@typescript-eslint/eslint-plugin
+npm error     dev @typescript-eslint/eslint-plugin@"^8.54.0" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry
+npm error this command with --force or --legacy-peer-deps
+npm error to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /root/.npm/_logs/2026-02-14T19_08_52_638Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-02-14T19_08_52_638Z-debug-0.log
+root@ubuntu-s-1vcpu-1gb-35gb-intel-atl1-01:~# cd wine-distributor-project && git pull && npm install && npm run build && pm2 restart wine-app
+remote: Enumerating objects: 5, done.
+remote: Counting objects: 100% (5/5), done.
+remote: Compressing objects: 100% (1/1), done.
+remote: Total 3 (delta 2), reused 3 (delta 2), pack-reused 0 (from 0)
+Unpacking objects: 100% (3/3), 319 bytes | 106.00 KiB/s, done.
+From https://github.com/buddhastephenson/wine-distributor-project
+   508159d..f83c9b1  main       -> origin/main
+Updating 508159d..f83c9b1
+error: Your local changes to the following files would be overwritten by merge:
+        package.json
+Please commit your changes or stash them before you merge.
+Abortinroot@ubuntu-s-1vcpu-1gb-35gb-intel-atl1-01:~/wine-distributor-project# cd wine-distributor-project && git reset --hard && git pull && npm install && npm run build && pm2 restart wine-app
+-bash: cd: wine-distributor-project: No such file or directorygroot@ubuntu-s-1vcpu-1gb-35gb-intel-atl1-01:~/wine-distributor-project# git reset --hard && git pull && npm install && npm run build && pm2 restart wine-app
+HEAD is now at 508159d Fix instant login on signup: Show pending message instead
+Updating 508159d..f83c9b1
+Fast-forward
+ package.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: eslint-plugin-jest@25.7.0
+npm warn Found: @typescript-eslint/eslint-plugin@8.54.0
+npm warn node_modules/@typescript-eslint/eslint-plugin
+npm warn   dev @typescript-eslint/eslint-plugin@"^8.54.0" from the root project
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional @typescript-eslint/eslint-plugin@"^4.0.0 || ^5.0.0" from eslint-plugin-jest@25.7.0
+npm warn node_modules/eslint-plugin-jest
+npm warn   eslint-plugin-jest@"^25.3.0" from eslint-config-react-app@7.0.1
+npm warn   node_modules/eslint-config-react-app
+npm warn
+npm warn Conflicting peer dependency: @typescript-eslint/eslint-plugin@5.62.0
+npm warn node_modules/@typescript-eslint/eslint-plugin
+npm warn   peerOptional @typescript-eslint/eslint-plugin@"^4.0.0 || ^5.0.0" from eslint-plugin-jest@25.7.0
+npm warn   node_modules/eslint-plugin-jest
+npm warn     eslint-plugin-jest@"^25.3.0" from eslint-config-react-app@7.0.1
+npm warn     node_modules/eslint-config-react-app
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: http-proxy-middleware@2.0.9
+npm warn Found: @types/express@5.0.6
+npm warn node_modules/@types/express
+npm warn   dev @types/express@"^5.0.6" from the root project
+npm warn   2 more (@types/multer, @types/serve-index)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional @types/express@"^4.17.13" from http-proxy-middleware@2.0.9
+npm warn node_modules/http-proxy-middleware
+npm warn   http-proxy-middleware@"^2.0.3" from webpack-dev-server@4.15.2
+npm warn   node_modules/webpack-dev-server
+npm warn
+npm warn Conflicting peer dependency: @types/express@4.17.25
+npm warn node_modules/@types/express
+npm warn   peerOptional @types/express@"^4.17.13" from http-proxy-middleware@2.0.9
+npm warn   node_modules/http-proxy-middleware
+npm warn     http-proxy-middleware@"^2.0.3" from webpack-dev-server@4.15.2
+npm warn     node_modules/webpack-dev-server
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: react-scripts@5.0.1
+npm error Found: typescript@5.9.3
+npm error node_modules/typescript
+npm error   dev typescript@"^5.9.3" from the root project
+npm error   peer typescript@">=4.8.4 <6.0.0" from @typescript-eslint/eslint-plugin@8.54.0
+npm error   node_modules/@typescript-eslint/eslint-plugin
+npm error     dev @typescript-eslint/eslint-plugin@"^8.54.0" from the root project
+npm error   13 more (@typescript-eslint/typescript-estree, ...)
+npm error
+npm error Could not resolve dependency:
+npm error peerOptional typescript@"^3.2.1 || ^4" from react-scripts@5.0.1
+npm error node_modules/react-scripts
+npm error   dev react-scripts@"5.0.1" from the root project
+npm error
+npm error Conflicting peer dependency: typescript@4.9.5
+npm error node_modules/typescript
+npm error   peerOptional typescript@"^3.2.1 || ^4" from react-scripts@5.0.1
+npm error   node_modules/react-scripts
+npm error     dev react-scripts@"5.0.1" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry
+npm error this command with --force or --legacy-peer-deps
+npm error to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /root/.npm/_logs/2026-02-14T19_16_11_010Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-02-14T19_16_11_010Z-debug-0.log
