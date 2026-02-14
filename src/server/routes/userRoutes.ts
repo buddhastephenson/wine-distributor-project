@@ -21,6 +21,9 @@ router.patch('/:id/username', UserController.updateUsername.bind(UserController)
 // PATCH /api/auth/users/:id/password
 router.patch('/:id/password', UserController.updatePassword.bind(UserController));
 
+// PATCH /api/auth/users/:id/status
+router.patch('/:id/status', UserController.updateUserStatus.bind(UserController));
+
 // DELETE /api/auth/users/:id
 router.delete('/:id', UserController.deleteUser.bind(UserController));
 

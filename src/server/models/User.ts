@@ -10,6 +10,7 @@ const UserSchema: Schema = new Schema({
     vendors: { type: [String], default: [] },
     email: { type: String, required: true, unique: true },
     accessRevoked: { type: Boolean, default: false },
+    status: { type: String, enum: ['active', 'pending', 'rejected'], default: 'pending' },
     resetToken: { type: String },
     resetTokenExpiry: { type: Number }
 }, {

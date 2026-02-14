@@ -47,6 +47,7 @@ class AuthService {
                 username,
                 password: hashedPassword,
                 type: 'customer',
+                status: 'pending',
                 email
             });
 
@@ -96,6 +97,14 @@ class AuthService {
 
             if (user.accessRevoked) {
                 return { success: false, error: 'Access Revoked. Please contact administrator.' };
+            }
+
+            if (user.status === 'pending') {
+                return { success: false, error: 'Account pending approval. Please contact administrator.' };
+            }
+
+            if (user.status === 'rejected') {
+                return { success: false, error: 'Account application rejected.' };
             }
 
             return {
@@ -239,6 +248,18 @@ class AuthService {
         await user.save();
 
         return { success: true, message: 'Password updated successfully' };
+    }
+
+    async updateStatus(id: string, status: 'active' | 'pending' | 'rejected') {
+        const user = await User.findOne({ id });
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
+
+        user.status = status;
+        await user.save();
+
+        return { success: true, user };
     }
 }
 

@@ -11,8 +11,8 @@ class UserService {
         return await User.findOne({ id }, '-password -__v');
     }
 
-    async updateUserRole(id: string, type: 'admin' | 'customer', vendors?: string[]): Promise<IUser | null> {
-        const updateData: any = { type };
+    async updateUserRole(id: string, type: 'admin' | 'customer', vendors?: string[], isSuperAdmin: boolean = false): Promise<IUser | null> {
+        const updateData: any = { type, isSuperAdmin };
         if (vendors) {
             updateData.vendors = vendors;
         } else if (type === 'customer') {

@@ -29,14 +29,14 @@ class UserController {
 
     async updateUserRole(req: Request, res: Response) {
         const { id } = req.params;
-        const { type, vendors } = req.body;
+        const { type, vendors, isSuperAdmin } = req.body;
 
         if (type !== 'admin' && type !== 'customer') {
             return res.status(400).json({ error: 'Invalid role type' });
         }
 
         try {
-            const user = await UserService.updateUserRole(id as string, type, vendors);
+            const user = await UserService.updateUserRole(id as string, type, vendors, isSuperAdmin);
             if (!user) return res.status(404).json({ error: 'User not found' });
             res.json({ success: true, user });
         } catch (error) {
@@ -88,6 +88,23 @@ class UserController {
             const user = await UserService.updatePassword(id as string, password);
             if (!user) return res.status(404).json({ error: 'User not found' });
             res.json({ success: true, message: 'Password updated successfully' });
+        } catch (error) {
+            res.status(500).json({ error: 'Update failed' });
+        }
+    }
+
+    async updateUserStatus(req: Request, res: Response) {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!['active', 'pending', 'rejected'].includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+
+        try {
+            const result = await AuthService.updateStatus(id as string, status);
+            if (!result.success) return res.status(404).json({ error: result.error });
+            res.json(result);
         } catch (error) {
             res.status(500).json({ error: 'Update failed' });
         }

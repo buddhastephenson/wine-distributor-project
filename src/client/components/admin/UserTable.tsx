@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { IUser } from '../../../shared/types'; // Correct relative path
 import { Button } from '../shared/Button';
 import { ConfirmationModal } from '../shared/ConfirmationModal';
-import { Edit2, Lock, Unlock, Trash2, UserCheck, Search, Key } from 'lucide-react';
+import { Edit2, Lock, Unlock, Trash2, UserCheck, Search, Key, Check } from 'lucide-react';
 import { userApi } from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -20,12 +20,18 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
     const isSuperAdmin = currentUser?.isSuperAdmin || ['Trey', 'Matt Cory', 'treystephenson'].includes(currentUser?.username || '');
 
     // Filter and Sort Users
+    // Prioritize PENDING users at the top
     const filteredUsers = users
         .filter(user =>
             user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
             user.email.toLowerCase().includes(searchQuery.toLowerCase())
         )
-        .sort((a, b) => a.username.localeCompare(b.username));
+        .sort((a, b) => {
+            // Pending users first
+            if (a.status === 'pending' && b.status !== 'pending') return -1;
+            if (a.status !== 'pending' && b.status === 'pending') return 1;
+            return a.username.localeCompare(b.username);
+        });
 
     const handleToggleAccess = async (user: IUser) => {
         setIsLoading(user.id);
@@ -34,6 +40,19 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
             onRefresh();
         } catch (error) {
             console.error('Failed to toggle access', error);
+        } finally {
+            setIsLoading(null);
+        }
+    };
+
+    const handleApproveUser = async (user: IUser) => {
+        setIsLoading(user.id);
+        try {
+            await userApi.updateStatus(user.id, 'active');
+            onRefresh();
+        } catch (error) {
+            console.error('Failed to approve user', error);
+            alert('Failed to approve user');
         } finally {
             setIsLoading(null);
         }
@@ -113,7 +132,7 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                 vendors = [selectedUserForRole.username];
             }
 
-            await userApi.updateRole(selectedUserForRole.id, type, vendors);
+            await userApi.updateRole(selectedUserForRole.id, type, vendors, selectedUserForRole.isSuperAdmin);
             setShowRoleModal(false);
             onRefresh();
         } catch (error) {
@@ -249,6 +268,19 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                     <div>
                                         <div className="font-bold text-purple-800">Admin (Staff)</div>
                                         <div className="text-xs text-slate-500">Full access to manage products, orders, and customers.</div>
+
+                                        {/* Super Admin Toggle - Only visible to Super Admins */}
+                                        {selectedRoleType === 'admin' && isSuperAdmin && (
+                                            <label className="flex items-center space-x-2 mt-2 pt-2 border-t border-gray-100">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedUserForRole?.isSuperAdmin || false}
+                                                    onChange={(e) => setSelectedUserForRole(prev => prev ? { ...prev, isSuperAdmin: e.target.checked } : null)}
+                                                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                                />
+                                                <span className="text-xs font-bold text-purple-900">Make Super Admin?</span>
+                                            </label>
+                                        )}
                                     </div>
                                 </label>
 
@@ -351,17 +383,51 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {user.accessRevoked ? (
-                                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                                    Revoked
+                                            {user.status === 'pending' && (
+                                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                                    Pending
                                                 </span>
-                                            ) : (
+                                            )}
+                                            {user.status === 'rejected' && (
+                                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                    Rejected
+                                                </span>
+                                            )}
+                                            {(user.status === 'active' || (!user.status && !user.accessRevoked)) && (
                                                 <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                                     Active
                                                 </span>
                                             )}
+                                            {user.accessRevoked && (
+                                                <span className="ml-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                    Locked
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            {/* Approve Button for Pending Users - Available to all Admins/Reps */}
+                                            {currentUser?.type === 'admin' && user.status === 'pending' && (
+                                                <button
+                                                    onClick={() => handleApproveUser(user)}
+                                                    disabled={isLoading === user.id}
+                                                    className="text-green-600 hover:text-green-900 mr-4 font-bold flex items-center float-left"
+                                                    title="Approve User"
+                                                >
+                                                    <Check size={18} className="mr-1" /> Approve
+                                                </button>
+                                            )}
+
+                                            {/* Password Reset - Admins can reset Customers; Super Amins can reset anyone */}
+                                            {currentUser?.type === 'admin' && (isSuperAdmin || user.type === 'customer') && (
+                                                <button
+                                                    onClick={() => handlePasswordResetClick(user)}
+                                                    className="text-amber-600 hover:text-amber-900 mr-4"
+                                                    title="Reset Password"
+                                                >
+                                                    <Key size={18} />
+                                                </button>
+                                            )}
+
                                             {isSuperAdmin && (
                                                 <>
                                                     <button
@@ -371,14 +437,6 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                                         title="Edit Role & Permissions"
                                                     >
                                                         <Edit2 size={18} />
-                                                    </button>
-
-                                                    <button
-                                                        onClick={() => handlePasswordResetClick(user)}
-                                                        className="text-amber-600 hover:text-amber-900 mr-4"
-                                                        title="Reset Password"
-                                                    >
-                                                        <Key size={18} />
                                                     </button>
 
                                                     <button
