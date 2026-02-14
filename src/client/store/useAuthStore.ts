@@ -48,8 +48,13 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null });
                 try {
                     const response = await authApi.signup(data);
-                    if (response.data.success && response.data.user) {
-                        set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+                    if (response.data.success) {
+                        if (response.data.user) {
+                            set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+                        } else {
+                            // Pending status - success but no login
+                            set({ isLoading: false, error: null });
+                        }
                     } else {
                         set({ error: response.data.error || 'Signup failed', isLoading: false });
                     }

@@ -60,12 +60,7 @@ class AuthService {
 
             return {
                 success: true,
-                user: {
-                    id: newUser.id,
-                    username: newUser.username,
-                    type: newUser.type as 'admin' | 'customer',
-                    email: newUser.email
-                }
+                message: 'Account created successfully. Pending administrator approval.'
             };
         } catch (error: any) {
             console.error('Signup Error:', error);

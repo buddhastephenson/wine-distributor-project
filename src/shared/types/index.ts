@@ -103,6 +103,7 @@ export interface IAuthResponse {
     user?: IUser;
     error?: string;
     token?: string; // For future JWT
+    message?: string;
 }
 
 export interface ITaxonomy {
