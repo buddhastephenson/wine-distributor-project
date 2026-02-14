@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, Package, Users, FileText, Settings, LogOut, Upload } from 'lucide-react';
+import { LayoutDashboard, Package, Users, FileText, Settings, LogOut, Upload, History } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 
@@ -31,6 +31,9 @@ export const Sidebar: React.FC = () => {
         // Orders: Admin (Rep/Super) AND Vendor (scoped)
         // Vendors should see orders now.
         { name: 'Orders', icon: <FileText size={20} />, path: isVendor ? '/vendor/orders' : '/admin/orders' },
+
+        // History: Admin (Rep/Super)
+        ...(!isVendor ? [{ name: 'Order History', icon: <History size={20} />, path: '/admin/history' }] : []),
 
         // Settings: Super Admin only
         ...(isSuperAdmin && !isVendor ? [{ name: 'Settings', icon: <Settings size={20} />, path: '/admin/settings' }] : []),

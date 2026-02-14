@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import SpecialOrderService from '../services/SpecialOrderService';
+import SpecialOrder from '../models/SpecialOrder';
+import User from '../models/User';
 
 class SpecialOrderController {
     async getAllSpecialOrders(req: Request, res: Response) {
@@ -88,6 +90,59 @@ class SpecialOrderController {
         } catch (error) {
             console.error('Bulk Delete Error:', error);
             res.status(500).json({ error: 'Failed to bulk delete orders' });
+        }
+    }
+    // Get historical orders for reporting (Super Admin only)
+    async getOrderHistory(req: Request, res: Response) {
+        try {
+            const { startDate, endDate, status } = req.query;
+
+            // Build query
+            const query: any = {};
+
+            // Date filtering (using createdAt)
+            if (startDate || endDate) {
+                query.createdAt = {};
+                if (startDate) query.createdAt.$gte = new Date(startDate as string);
+                // End date should be end of day
+                if (endDate) {
+                    const end = new Date(endDate as string);
+                    end.setHours(23, 59, 59, 999);
+                    query.createdAt.$lte = end;
+                }
+            }
+
+            // Status filtering
+            if (status) {
+                // Support multiple statuses comma-separated
+                const statuses = (status as string).split(',');
+                if (statuses.length > 0) {
+                    query.status = { $in: statuses };
+                }
+            }
+
+            // Fetch orders
+            const orders = await SpecialOrder.find(query).sort({ createdAt: -1 });
+
+            // Fetch all current users (id and username)
+            // We use this to filter out orders from users that no longer exist
+            // Fetch all current users (id and username)
+            // We use this to filter out orders from users that no longer exist
+            const currentUsers = await User.find({}, 'username');
+            const validUsernames = new Set(currentUsers.map((u: any) => u.username.toLowerCase()));
+            const validUsernamesOriginal = new Set(currentUsers.map((u: any) => u.username));
+
+            // Filter orders where username is NOT in validUsernames
+            // Case-insensitive check might be safest, but let's try strict first then fallback
+            const filteredOrders = orders.filter((order: any) => {
+                if (!order.username) return false;
+                return validUsernames.has(order.username.toLowerCase());
+            });
+
+            res.json(filteredOrders);
+        } catch (error) {
+            console.error('Error fetching order history:', error);
+            res.status(500).json({ error: 'Failed to fetch order history' });
         }
     }
 }

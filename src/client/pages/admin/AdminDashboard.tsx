@@ -1,4 +1,6 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { History } from 'lucide-react';
 import { DashboardStats } from '../../components/admin/DashboardStats';
 import { useProductStore } from '../../store/useProductStore';
 // import { useOrderStore } from '../../store/useOrderStore'; // TODO
@@ -11,6 +13,7 @@ export const AdminDashboard: React.FC = () => {
     // We can use a local state for user count
     const [userCount, setUserCount] = React.useState(0);
     const { products, specialOrders, fetchProducts, fetchSpecialOrders } = useProductStore();
+    const navigate = useNavigate();
 
     React.useEffect(() => {
         // Fetch users to get count
@@ -33,6 +36,21 @@ export const AdminDashboard: React.FC = () => {
                 orderCount={activeOrders.length}
                 pendingCount={pendingOrders.length}
             />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div
+                    onClick={() => navigate('/admin/history')}
+                    className="bg-white p-6 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow flex items-center space-x-4 border border-gray-100"
+                >
+                    <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
+                        <History size={24} />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-900">Historical Report</h3>
+                        <p className="text-sm text-gray-500">View and export past orders</p>
+                    </div>
+                </div>
+            </div>
 
             {/* Recent Activity or Quick Links could go here */}
         </div>

@@ -19,13 +19,20 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
 
     const isSuperAdmin = currentUser?.isSuperAdmin || ['Trey', 'Matt Cory', 'treystephenson'].includes(currentUser?.username || '');
 
+    const [showRevoked, setShowRevoked] = useState(false);
+
     // Filter and Sort Users
     // Prioritize PENDING users at the top
     const filteredUsers = users
-        .filter(user =>
-            user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        .filter(user => {
+            const matchesSearch = user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                user.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+            // If showRevoked is false, hide revoked users
+            if (!showRevoked && user.accessRevoked) return false;
+
+            return matchesSearch;
+        })
         .sort((a, b) => {
             // Pending users first
             if (a.status === 'pending' && b.status !== 'pending') return -1;
@@ -204,9 +211,20 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <Button onClick={() => setShowQuickAddModal(true)}>
-                    + Add Customer
-                </Button>
+                <div className="flex items-center space-x-4">
+                    <label className="flex items-center space-x-2 text-sm text-gray-600">
+                        <input
+                            type="checkbox"
+                            checked={showRevoked}
+                            onChange={(e) => setShowRevoked(e.target.checked)}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Show Disabled Users</span>
+                    </label>
+                    <Button onClick={() => setShowQuickAddModal(true)}>
+                        + Add Customer
+                    </Button>
+                </div>
             </div>
 
             {/* Quick Add Modal */}

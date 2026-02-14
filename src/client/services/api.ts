@@ -66,6 +66,7 @@ export const specialOrderApi = {
     delete: (id: string) => api.delete<{ success: boolean }>(`/special-orders/${id}`),
     bulkDelete: (ids: string[]) => api.delete<{ success: boolean; message: string }>('/special-orders/bulk', { data: { ids } }),
     batchUpdateStatus: (updates: { id: string, status: string }[]) => api.post<{ success: boolean }>('/special-orders/batch-status', updates),
+    getHistory: (params: { startDate?: string; endDate?: string; status?: string }) => api.get<ISpecialOrder[]>('/special-orders/history', { params }),
 };
 
 export const userApi = {

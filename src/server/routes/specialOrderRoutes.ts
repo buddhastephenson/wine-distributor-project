@@ -24,4 +24,13 @@ router.delete('/bulk', SpecialOrderController.bulkDeleteSpecialOrders.bind(Speci
 // DELETE /api/special-orders/:id
 router.delete('/:id', SpecialOrderController.deleteSpecialOrder.bind(SpecialOrderController));
 
+// History Report (Super Admin)
+router.get('/history', authenticate, (req, res, next) => {
+    // Check for super admin
+    if ((req as any).user?.type !== 'admin') { // Currently allowing all admins, could restrict to super admin if needed
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    next();
+}, SpecialOrderController.getOrderHistory);
+
 export default router;

@@ -11,6 +11,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { UsersPage } from './pages/admin/UsersPage';
 import { CatalogPage } from './pages/catalog/CatalogPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
+import { HistoryPage } from './pages/admin/HistoryPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { ImportPage } from './pages/admin/ImportPage';
 import { useAuthStore } from './store/useAuthStore';
@@ -76,6 +77,7 @@ const App: React.FC = () => {
                                     <Route path="/users" element={<UsersPage />} />
                                     <Route path="/products" element={<CatalogPage />} />
                                     <Route path="/orders" element={<OrdersPage />} />
+                                    <Route path="/history" element={<HistoryPage />} />
                                     <Route path="/import" element={<ImportPage />} />
                                     <Route path="/settings" element={<SettingsPage />} />
                                     <Route path="*" element={<Navigate to="/admin" replace />} />
