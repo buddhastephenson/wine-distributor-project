@@ -78,6 +78,7 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                         </div>
                         {!isReadOnly && (
                             currentUser?.type === 'admin' ||
+                            currentUser?.type === 'vendor' ||
                             !item.submitted ||
                             (item.status || '').toLowerCase() === 'pending'
                         ) && (
@@ -125,18 +126,19 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                     />
 
                     <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                        {currentUser?.type === 'admin' ? (
+                        {currentUser?.type === 'admin' || currentUser?.type === 'vendor' ? (
                             <div className="relative">
                                 <select
                                     value={item.status || ORDER_STATUS.PENDING}
                                     onChange={(e) => onUpdate(item.id, { status: e.target.value, hasUnseenUpdate: true })}
                                     className={`appearance-none text-[10px] font-black uppercase tracking-widest px-3 py-1 pr-6 rounded-full border cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500/20 ${((item.status || 'Pending').toLowerCase().includes('pending')) ? 'bg-slate-50 text-slate-400 border-slate-100' :
                                         (item.status || '').includes('On Purchase Order') ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                            (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                    (item.status || '').includes('Delivered') ? 'bg-green-50 text-green-700 border-green-100' :
-                                                        (item.status || '').includes('Not Available') ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                                            'bg-gray-50 text-gray-600 border-gray-100'
+                                            (item.status || '').includes('Booked w/ Supplier') ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                                (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                    (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                        (item.status || '').includes('Delivered') ? 'bg-green-50 text-green-700 border-green-100' :
+                                                            (item.status || '').includes('Not Available') ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                                'bg-gray-50 text-gray-600 border-gray-100'
                                         }`}
                                 >
                                     {Object.values(ORDER_STATUS).map((status) => (
@@ -154,11 +156,12 @@ export const OrderList: React.FC<OrderListProps> = ({ orders, currentUser, onUpd
                         ) : (
                             <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${((item.status || 'Pending').toLowerCase().includes('pending')) ? 'bg-slate-50 text-slate-400 border-slate-100' :
                                 (item.status || '').includes('On Purchase Order') ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                    (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                        (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                            (item.status || '').includes('Delivered') ? 'bg-green-50 text-green-700 border-green-100' :
-                                                (item.status || '').includes('Not Available') ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                                    'bg-gray-50 text-gray-600 border-gray-100'
+                                    (item.status || '').includes('Booked w/ Supplier') ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                        (item.status || '').includes('Arrived') || (item.status || '').includes('Stock') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                            (item.status || '').includes('Backordered') ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                (item.status || '').includes('Delivered') ? 'bg-green-50 text-green-700 border-green-100' :
+                                                    (item.status || '').includes('Not Available') ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                        'bg-gray-50 text-gray-600 border-gray-100'
                                 }`}>
                                 {item.status || 'Pending'}
                             </span>
