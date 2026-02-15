@@ -193,4 +193,167 @@ npm error
 npm error
 npm error For a full report see:
 npm error /root/.npm/_logs/2026-02-14T19_16_11_010Z-eresolve-report.txt
-npm error A complete log of this run can be found in: /root/.npm/_logs/2026-02-14T19_16_11_010Z-debug-0.log
+npm error A complete log of this run can be found in: /root/.npm/_logs/2026-02-14T19_16_11_010Z-debug-0.logroot@ubuntu-s-1vcpu-1gb-35gb-intel-atl1-01:~/wine-distributor-project# git reset --hard && git pull && npm install --legacy-peer-deps && npm run build && pm2 restart wine-app
+HEAD is now at 28cadfc Downgrade ESLint to fix deployment (again)
+Already up to date.
+
+up to date, audited 1445 packages in 4s
+
+297 packages are looking for funding
+  run `npm fund` for details
+
+13 vulnerabilities (1 low, 3 moderate, 9 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues possible (including breaking changes), run:
+  npm audit fix --force
+
+Some issues need review, and may require choosing
+a different dependency.
+
+Run `npm audit` for details.
+
+> aoc-wines-distributor@1.0.0 build
+> react-scripts build
+
+Creating an optimized production build...
+Compiled with warnings.
+
+[eslint] 
+src/client/App.tsx
+  Line 1:17:  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/client/components/admin/UserTable.tsx
+  Line 93:12:   'vendorListInput' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  Line 158:25:  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+
+src/client/components/catalog/ProductCard.tsx
+  Line 9:41:   Unexpected any. Specify a different type                                      @typescript-eslint/no-explicit-any
+  Line 15:93:  'isDarkMode' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+src/client/components/catalog/ProductEditModal.tsx
+  Line 4:13:   'Save' is defined but never used          @typescript-eslint/no-unused-vars
+  Line 71:23:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/client/components/catalog/ProductGrid.tsx
+  Line 10:41:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/client/components/catalog/TaxonomySidebar.tsx
+  Line 46:5:  'bottleSizes' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+src/client/components/layouts/Navbar.tsx
+  Line 3:10:  'ShoppingCart' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/client/components/layouts/Sidebar.tsx
+  Line 3:63:  'LogOut' is defined but never used           @typescript-eslint/no-unused-vars
+  Line 8:13:  'logout' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+src/client/components/layouts/VendorLayout.tsx
+  Line 3:29:  'Outlet' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/client/components/orders/OrderList.tsx
+  Line 3:10:  'Check' is defined but never used   @typescript-eslint/no-unused-vars
+  Line 3:17:  'Trash2' is defined but never used  @typescript-eslint/no-unused-vars
+  Line 5:16:  'uuidv4' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/client/pages/admin/AdminDashboard.tsx
+  Line 5:10:  'useAuthStore' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/client/pages/admin/ImportPage.tsx
+  Line 4:10:     'Upload' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+  Line 4:54:     'Save' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+  Line 4:60:     'X' is defined but never used                                                                                     @typescript-eslint/no-unused-vars
+  Line 31:85:    Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 35:52:    Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 44:44:    Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 69:8:     React Hook useEffect has a missing dependency: 'fetchProducts'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  Line 102:33:   Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 143:62:   Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 164:37:   Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 175:73:   Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 190:19:   'vendorPortfolios' is assigned a value but never used                                                             @typescript-eslint/no-unused-vars
+  Line 278:23:   Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  Line 613:102:  Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+
+src/client/pages/catalog/CatalogPage.tsx
+  Line 15:19:   'isAuthenticated' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  Line 131:46:  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+  Line 131:60:  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+  Line 233:54:  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+  Line 236:31:  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+
+src/client/pages/orders/OrdersPage.tsx
+  Line 24:48:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 189:92:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 192:59:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 193:56:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/client/services/api.ts
+  Line 47:26:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 49:20:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 51:27:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 59:24:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 59:131:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 83:32:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/client/store/useAuthStore.ts
+  Line 12:26:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 13:20:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 39:33:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 61:33:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/client/store/useProductStore.ts
+  Line 39:25:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 49:25:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 77:25:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 93:25:   Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 137:25:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  Line 182:25:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/client/utils/export.ts
+  Line 44:45:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+src/client/utils/formulas.ts
+  Line 1:31:  'IFormula' is defined but never used  @typescript-eslint/no-unused-vars
+
+src/shared/types/index.ts
+  Line 111:11:  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+File sizes after gzip:
+
+  267.14 kB  build/static/js/main.c4e6d31a.js
+  290 B      build/static/css/main.92c8d4eb.css
+
+The project was built assuming it is hosted at https://trade.aocwinecompany.com/.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [wine-app](ids: [ 0 ])
+[PM2] [wine-app](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ wine-app           │ fork     │ 4    │ online    │ 0%       │ 19.1mb   │root@ubuntu-s-1vcpu-1gb-35gb-intel-atl1-01:~# cd wine-distributor-project && pm2 delete wine-app && pm2 start ecosystem.config.js
+[PM2] Applying action deleteProcessId on app [wine-app](ids: [ 0 ])
+[PM2] [wine-app](0) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+[PM2][WARN] Applications wine-app not running, starting...
+[PM2] App [wine-app] launched (1 instances)
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ wine-app           │ fork     │ 0    │ online    │ 0%       │ 18.5mb   │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
