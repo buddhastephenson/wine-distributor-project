@@ -59,7 +59,7 @@ app.get(/(.*)/, (req, res) => {
 // Start Server
 app.listen(SERVER_PORT, () => {
     console.log(`Server running at http://localhost:${SERVER_PORT}`);
-    // Server restarted
+    // Server restarted via tool call to force update.
 });
 
 export default app;

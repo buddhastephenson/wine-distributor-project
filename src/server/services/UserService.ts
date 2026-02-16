@@ -11,7 +11,7 @@ class UserService {
         return await User.findOne({ id }, '-password -__v');
     }
 
-    async updateUserRole(id: string, type: 'admin' | 'customer', vendors?: string[], isSuperAdmin: boolean = false): Promise<IUser | null> {
+    async updateUserRole(id: string, type: 'admin' | 'customer' | 'vendor', vendors?: string[], isSuperAdmin: boolean = false): Promise<IUser | null> {
         const updateData: any = { type, isSuperAdmin };
         if (vendors) {
             updateData.vendors = vendors;
@@ -56,6 +56,25 @@ class UserService {
 
         await User.findOneAndDelete({ id });
         return true;
+    }
+
+    async assignSupplier(supplierName: string, vendorId?: string): Promise<{ success: boolean; message: string }> {
+        // 1. Remove this supplier from ALL vendors to ensure exclusivity
+        await User.updateMany(
+            { vendors: supplierName },
+            { $pull: { vendors: supplierName } }
+        );
+
+        // 2. If a vendorId is provided, add it to that vendor
+        if (vendorId) {
+            await User.findOneAndUpdate(
+                { id: vendorId },
+                { $addToSet: { vendors: supplierName } }
+            );
+            return { success: true, message: `Assigned "${supplierName}" to vendor.` };
+        }
+
+        return { success: true, message: `Unassigned "${supplierName}".` };
     }
 }
 

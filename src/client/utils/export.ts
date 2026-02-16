@@ -1,11 +1,10 @@
 import * as XLSX from 'xlsx';
 import { ISpecialOrder } from '../../shared/types';
 
-export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 'orders.xlsx') => {
+export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 'orders.xlsx', vendorMap: Record<string, string> = {}) => {
     // Flatten data for export
     const data = orders.map(order => {
         // Extract latest chat info if available, or just count
-        // Extract full chat history
         const chatInfo = order.messages && order.messages.length > 0
             ? order.messages.map(msg => {
                 const date = new Date(msg.timestamp).toLocaleDateString();
@@ -13,11 +12,17 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
             }).join('\n')
             : order.adminNotes || order.notes || '';
 
+        // "Vendor" column should be the User (Vendor) Name
+        // "Import Name" column should be the Price List/Supplier Name
+        const supplierName = order.supplier || 'Unknown';
+        const vendorName = vendorMap[supplierName] || (order.supplier ? 'Unassigned' : '');
+
         return {
             'Item Code': order.itemCode || '',
             'Order ID': order.id, // Needed for re-import
             'Customer': order.username || 'Unknown',
-            'Vendor': order.supplier || '',
+            'Vendor': vendorName, // Real Human Vendor
+            'Import Name': supplierName, // Price List Name
             'Producer': order.producer || '',
             'Product': order.productName || '',
             'Vintage': order.vintage || '',

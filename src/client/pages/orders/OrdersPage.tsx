@@ -6,12 +6,39 @@ import { OrderList } from '../../components/orders/OrderList';
 import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload, Trash2 } from 'lucide-react';
 import { exportOrdersToExcel } from '../../utils/export';
 import { ConfirmationModal } from '../../components/shared/ConfirmationModal';
+import { userApi } from '../../services/api'; // Import userApi
 
 export const OrdersPage: React.FC = () => {
     const { specialOrders, fetchSpecialOrders, updateSpecialOrder, deleteSpecialOrder, bulkDeleteSpecialOrders, isLoading, error } = useProductStore();
     const { user } = useAuthStore();
     const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
     const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+    const [vendorMap, setVendorMap] = useState<Record<string, string>>({}); // valid map
+
+    // Fetch users to map suppliers to vendors (Admin only)
+    useEffect(() => {
+        const fetchVendorMap = async () => {
+            if (user?.type === 'admin') {
+                try {
+                    const response = await userApi.getAll();
+                    // users are in response.data? No, api.ts says api.get<IUser[]>, so response.data is IUser[]
+                    const users = response.data;
+                    const map: Record<string, string> = {};
+                    users.forEach(u => {
+                        if (u.vendors && Array.isArray(u.vendors)) {
+                            u.vendors.forEach(v => {
+                                map[v] = u.username;
+                            });
+                        }
+                    });
+                    setVendorMap(map);
+                } catch (err) {
+                    console.error("Failed to fetch users for vendor map", err);
+                }
+            }
+        };
+        fetchVendorMap();
+    }, [user?.type]);
 
     useEffect(() => {
         if (user?.type === 'admin' || user?.type === 'vendor') {
@@ -61,14 +88,8 @@ export const OrdersPage: React.FC = () => {
         return filtered.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     }, [pendingOrders, submittedOrders, user?.type, searchQuery]);
 
-    // ... (rest of code)
-
-    // Filtered Lists based on Role/Selection
     const displayedPending = useMemo(() => {
         if (user?.type === 'customer') return pendingOrders;
-        // For Admin and Vendor, if no customer selected, show all (or maybe show none? Admin shows none initially? No, Admin code above: `if (!selectedCustomer) return [];` wait, let me check original code).
-        // Original code: `if (!selectedCustomer) return [];` for Admin.
-        // So Admins/Vendors pick a customer to see orders.
         if (!selectedCustomer) return [];
         return pendingOrders.filter(o => (o.username || 'Unknown') === selectedCustomer);
     }, [pendingOrders, selectedCustomer, user?.type]);
@@ -79,7 +100,6 @@ export const OrdersPage: React.FC = () => {
         return submittedOrders.filter(o => (o.username || 'Unknown') === selectedCustomer);
     }, [submittedOrders, selectedCustomer, user?.type]);
 
-
     const location = useLocation();
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -89,7 +109,6 @@ export const OrdersPage: React.FC = () => {
             window.history.replaceState({}, document.title);
         }
         if (location.state?.highlightOrderId) {
-            // Include a small delay to ensure rendering
             setTimeout(() => {
                 const element = document.getElementById(`order-${location.state.highlightOrderId}`);
                 if (element) {
@@ -98,8 +117,6 @@ export const OrdersPage: React.FC = () => {
                     setTimeout(() => element.classList.remove('ring-2', 'ring-rose-500', 'ring-offset-2'), 3000);
                 }
             }, 500);
-            // Clear state to prevent scrolling on refresh - care needed not to wipe successMessage if present
-            // simplistic approach: just clear highlightOrderId
             const state = { ...location.state };
             delete state.highlightOrderId;
             window.history.replaceState(state, document.title);
@@ -126,7 +143,7 @@ export const OrdersPage: React.FC = () => {
         // Export ALL orders (or maybe just the filtered ones? Requirement: "Review Orders box should just be an Excel export of all orders")
         // Assuming "all orders" means everything visible to admin.
         const ordersToExport = user?.type === 'admin' ? [...pendingOrders, ...submittedOrders] : [...displayedPending, ...displayedSubmitted];
-        exportOrdersToExcel(ordersToExport, `AOC_Orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+        exportOrdersToExcel(ordersToExport, `AOC_Orders_${new Date().toISOString().split('T')[0]}.xlsx`, vendorMap);
     };
 
     const handleBulkDelete = () => {

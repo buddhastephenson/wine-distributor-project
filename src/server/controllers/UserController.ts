@@ -30,8 +30,9 @@ class UserController {
     async updateUserRole(req: Request, res: Response) {
         const { id } = req.params;
         const { type, vendors, isSuperAdmin } = req.body;
+        console.log(`UpdateUserRole called for ${id}. Type: ${type}, Body:`, req.body);
 
-        if (type !== 'admin' && type !== 'customer') {
+        if (type !== 'admin' && type !== 'customer' && type !== 'vendor') {
             return res.status(400).json({ error: 'Invalid role type' });
         }
 
@@ -127,6 +128,22 @@ class UserController {
                 return res.status(403).json({ error: error.message });
             }
             res.status(500).json({ error: 'Delete failed' });
+        }
+    }
+
+    async assignSupplier(req: Request, res: Response) {
+        const { supplierName, vendorId } = req.body;
+
+        if (!supplierName) {
+            return res.status(400).json({ error: 'Supplier name is required' });
+        }
+
+        try {
+            const result = await UserService.assignSupplier(supplierName, vendorId);
+            res.json(result);
+        } catch (error) {
+            console.error('Assign Supplier Error:', error);
+            res.status(500).json({ error: 'Failed to assign supplier' });
         }
     }
 }
