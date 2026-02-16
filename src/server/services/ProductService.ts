@@ -1,5 +1,6 @@
 import Product from '../models/Product';
 import SpecialOrder from '../models/SpecialOrder';
+import mongoose from 'mongoose';
 import { IProduct } from '../../shared/types';
 
 import { IUser } from '../../shared/types';
@@ -178,6 +179,110 @@ class ProductService {
         if (operations.length > 0) {
             await Product.bulkWrite(operations);
         }
+    }
+
+    async findDuplicates(): Promise<any[]> {
+        const pipeline = [
+            {
+                $group: {
+                    _id: { itemCode: "$itemCode", supplier: "$supplier" },
+                    count: { $sum: 1 },
+                    docs: { $push: { id: { $ifNull: ["$id", { $toString: "$_id" }] }, updatedAt: "$updatedAt", uploadDate: "$uploadDate", productName: "$productName", itemCode: "$itemCode", supplier: "$supplier", vintage: "$vintage", bottleSize: "$bottleSize" } }
+                }
+            },
+            {
+                $match: {
+                    count: { $gt: 1 }
+                }
+            }
+        ];
+
+        return await Product.aggregate(pipeline);
+    }
+
+    async deduplicate(groups: { winnerId: string, loserIds: string[] }[]): Promise<{ merged: number, deleted: number }> {
+        let totalMerged = 0;
+        let totalDeleted = 0;
+
+        for (const group of groups) {
+            // Re-assign orders
+            const updateResult = await SpecialOrder.updateMany(
+                { productId: { $in: group.loserIds } },
+                { $set: { productId: group.winnerId } }
+            );
+
+            if (updateResult.modifiedCount > 0) {
+                console.log(`Re-assigned ${updateResult.modifiedCount} orders to winner ${group.winnerId}`);
+            }
+
+            // Delete losers (check both id and _id for legacy compatibility)
+            // SAFELY handle _id query by filtering for valid ObjectIds first
+            const validObjectIds = group.loserIds
+                .filter(id => mongoose.Types.ObjectId.isValid(id))
+                .map(id => new mongoose.Types.ObjectId(id));
+
+            const deleteResult = await Product.deleteMany({
+                $or: [
+                    { id: { $in: group.loserIds } },
+                    { _id: { $in: validObjectIds } }
+                ]
+            });
+
+            totalDeleted += deleteResult.deletedCount;
+            totalMerged++;
+        }
+
+        return { merged: totalMerged, deleted: totalDeleted };
+    }
+
+    // --- Supplier Management ---
+
+    async getSupplierStats(): Promise<{ supplier: string, count: number }[]> {
+        // Aggregate products by supplier to get counts
+        const stats = await Product.aggregate([
+            { $group: { _id: "$supplier", count: { $sum: 1 } } },
+            { $sort: { _id: 1 } },
+            { $project: { supplier: "$_id", count: 1, _id: 0 } }
+        ]);
+        return stats.filter(s => s.supplier); // Filter out null/empty suppliers if any
+    }
+
+    async renameSupplier(oldName: string, newName: string): Promise<{ productsUpdated: number, ordersUpdated: number }> {
+        // 1. Update Products
+        const productResult = await Product.updateMany(
+            { supplier: oldName },
+            { $set: { supplier: newName } }
+        );
+
+        // 2. Update Special Orders (Historical accuracy vs Live data)
+        // Ideally we update them so history reflects the "current" name of the portfolio
+        const orderResult = await SpecialOrder.updateMany(
+            { supplier: oldName },
+            { $set: { supplier: newName } }
+        );
+
+        return {
+            productsUpdated: productResult.modifiedCount,
+            ordersUpdated: orderResult.modifiedCount
+        };
+    }
+
+    async deleteSupplier(name: string): Promise<{ productsDeleted: number, ordersUpdated: number }> {
+        // 1. Delete Products
+        const productResult = await Product.deleteMany({ supplier: name });
+
+        // 2. ORPHAN special orders? Or just leave them?
+        // If we delete the products, the orders might still exist but point to nothing.
+        // Let's NOT delete orders, but maybe mark them? Or leave them as history.
+        // Requirement was "delete all products".
+
+        // We will log how many orders are affected (orphaned)
+        const affectedOrders = await SpecialOrder.countDocuments({ supplier: name });
+
+        return {
+            productsDeleted: productResult.deletedCount,
+            ordersUpdated: affectedOrders // valid but potentially orphaned
+        };
     }
 }
 

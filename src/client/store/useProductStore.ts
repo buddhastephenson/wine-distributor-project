@@ -22,6 +22,13 @@ interface ProductState {
     updateProduct: (id: string, updates: Partial<IProduct>) => Promise<void>;
     deleteProduct: (id: string) => Promise<void>;
     updateFormulas: (formulas: IFormulas) => Promise<void>;
+    scanDuplicates: () => Promise<any[]>;
+    executeDeduplication: (groups: { winnerId: string, loserIds: string[] }[]) => Promise<{ merged: number, deleted: number }>;
+
+    // Supplier Management
+    fetchSupplierStats: () => Promise<{ supplier: string; count: number }[]>;
+    renameSupplier: (oldName: string, newName: string) => Promise<{ productsUpdated: number; ordersUpdated: number }>;
+    deleteSupplier: (name: string) => Promise<{ productsDeleted: number; ordersUpdated: number }>;
 }
 
 export const useProductStore = create<ProductState>((set, get) => ({
@@ -192,6 +199,58 @@ export const useProductStore = create<ProductState>((set, get) => ({
         } catch (error) {
             console.error('Failed to save formulas:', error);
             // Revert or show error? For now just log
+        }
+    },
+
+    scanDuplicates: async () => {
+        try {
+            const response = await productApi.scanDuplicates();
+            return response.data.duplicates;
+        } catch (error) {
+            console.error('Scan failed:', error);
+            return [];
+        }
+    },
+
+    executeDeduplication: async (groups) => {
+        try {
+            const response = await productApi.executeDeduplication(groups);
+            return response.data.stats;
+        } catch (error) {
+            console.error('Deduplication failed:', error);
+            throw error;
+        }
+    },
+
+    // --- Supplier Management ---
+
+    fetchSupplierStats: async () => {
+        try {
+            const response = await productApi.getSuppliers();
+            return response.data.stats;
+        } catch (error) {
+            console.error('Failed to fetch supplier stats:', error);
+            return [];
+        }
+    },
+
+    renameSupplier: async (oldName, newName) => {
+        try {
+            const response = await productApi.renameSupplier(oldName, newName);
+            return response.data.result;
+        } catch (error) {
+            console.error('Failed to rename supplier:', error);
+            throw error;
+        }
+    },
+
+    deleteSupplier: async (name) => {
+        try {
+            const response = await productApi.deleteSupplier(name);
+            return response.data.result;
+        } catch (error) {
+            console.error('Failed to delete supplier:', error);
+            throw error;
         }
     }
 }));

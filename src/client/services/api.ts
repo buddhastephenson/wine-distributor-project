@@ -57,6 +57,13 @@ export const productApi = {
     update: (id: string, updates: Partial<IProduct>) => api.patch<{ success: boolean; product: IProduct }>(`/products/${id}`, updates),
     delete: (id: string) => api.delete<{ success: boolean }>(`/products/${id}`),
     import: (products: any[], supplier: string, vendorId?: string, newVendorName?: string) => api.post<{ success: boolean; stats: any }>('/products/import', { products, supplier, vendorId, newVendorName }),
+    scanDuplicates: () => api.get<{ success: boolean; duplicates: any[] }>('/products/deduplicate/scan'),
+    executeDeduplication: (groups: { winnerId: string, loserIds: string[] }[]) => api.post<{ success: boolean; stats: { merged: number, deleted: number } }>('/products/deduplicate/execute', { groups }),
+
+    // Supplier Management
+    getSuppliers: () => api.get<{ success: boolean; stats: { supplier: string; count: number }[] }>('/products/suppliers/stats'),
+    renameSupplier: (oldName: string, newName: string) => api.post<{ success: boolean; result: { productsUpdated: number; ordersUpdated: number } }>('/products/suppliers/rename', { oldName, newName }),
+    deleteSupplier: (name: string) => api.delete<{ success: boolean; result: { productsDeleted: number; ordersUpdated: number } }>(`/products/suppliers/${encodeURIComponent(name)}`),
 };
 
 export const specialOrderApi = {

@@ -207,6 +207,93 @@ class ProductController {
             res.status(500).json({ error: `Import failed: ${error.message}` });
         }
     }
+
+    async deduplicateScan(req: Request, res: Response) {
+        const user = req.user;
+        if (user?.type !== 'admin') {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        try {
+            const duplicates = await ProductService.findDuplicates();
+            res.json({ success: true, duplicates });
+        } catch (error) {
+            console.error('Deduplication scan failed:', error);
+            res.status(500).json({ error: 'Scan failed' });
+        }
+    }
+
+    async deduplicateExecute(req: Request, res: Response) {
+        const user = req.user;
+        if (user?.type !== 'admin') {
+            return res.status(403).json({ error: 'Unauthorized' });
+        }
+
+        const { groups } = req.body;
+        if (!groups || !Array.isArray(groups)) {
+            return res.status(400).json({ error: 'Invalid groups data' });
+        }
+
+        try {
+            console.log('Executing deduplication with groups:', JSON.stringify(groups, null, 2));
+            const stats = await ProductService.deduplicate(groups);
+            res.json({ success: true, stats });
+        } catch (error: any) {
+            console.error('Deduplication execution failed:', error);
+            res.status(500).json({ error: `Execution failed: ${error.message}` });
+        }
+    }
+
+    // --- Supplier Management ---
+
+    async getSuppliers(req: Request, res: Response) {
+        const user = req.user;
+        // Verify admin
+        if (user?.type !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
+
+        try {
+            const stats = await ProductService.getSupplierStats();
+            res.json({ success: true, stats });
+        } catch (error) {
+            console.error('Failed to get supplier stats:', error);
+            res.status(500).json({ error: 'Failed to fetch suppliers' });
+        }
+    }
+
+    async renameSupplier(req: Request, res: Response) {
+        const user = req.user;
+        if (user?.type !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
+
+        const { oldName, newName } = req.body;
+        if (!oldName || !newName) return res.status(400).json({ error: 'Old name and new name are required' });
+
+        try {
+            const result = await ProductService.renameSupplier(oldName, newName);
+            res.json({ success: true, result });
+        } catch (error) {
+            console.error('Failed to rename supplier:', error);
+            res.status(500).json({ error: 'Failed to rename supplier' });
+        }
+    }
+
+    async deleteSupplier(req: Request, res: Response) {
+        const user = req.user;
+        if (user?.type !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
+
+        const { name } = req.params; // or body? Let's verify REST pattern. DELETE /suppliers/:name usually.
+        // Wait, name might have spaces, so maybe body or encoded URL.
+        // Let's assume passed in URL but decoded.
+
+        if (!name) return res.status(400).json({ error: 'Supplier name required' });
+
+        try {
+            const result = await ProductService.deleteSupplier(decodeURIComponent(name as string));
+            res.json({ success: true, result });
+        } catch (error) {
+            console.error('Failed to delete supplier:', error);
+            res.status(500).json({ error: 'Failed to delete supplier' });
+        }
+    }
 }
 
 export default new ProductController();
