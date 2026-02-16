@@ -38,16 +38,17 @@ export const SupplierManagementModal: React.FC<SupplierManagementModalProps> = (
                 userApi.getAll()
             ]);
 
-            setSuppliers(stats);
-            setAllUsers(userResponse.data);
+            setSuppliers(Array.isArray(stats) ? stats : []);
+            setAllUsers(Array.isArray(userResponse.data) ? userResponse.data : []);
 
             // Filter only vendors
-            const vendorUsers = userResponse.data.filter(u => u.type === 'vendor');
+            const users = Array.isArray(userResponse.data) ? userResponse.data : [];
+            const vendorUsers = users.filter(u => u.type === 'vendor');
             setVendors(vendorUsers);
 
             // Build map: which vendor owns which supplier
             const map: Record<string, string> = {};
-            userResponse.data.forEach(u => {
+            users.forEach(u => {
                 if (u.vendors && Array.isArray(u.vendors)) {
                     u.vendors.forEach(v => {
                         map[v] = u.id;

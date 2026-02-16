@@ -227,7 +227,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     fetchSupplierStats: async () => {
         try {
             const response = await productApi.getSuppliers();
-            return response.data.stats;
+            return Array.isArray(response.data.stats) ? response.data.stats : [];
         } catch (error) {
             console.error('Failed to fetch supplier stats:', error);
             return [];
