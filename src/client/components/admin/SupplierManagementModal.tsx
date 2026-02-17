@@ -30,15 +30,18 @@ export const SupplierManagementModal: React.FC<SupplierManagementModalProps> = (
         }
     }, [isOpen]);
 
+    const [debugCount, setDebugCount] = useState<number | null>(null);
+
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [stats, userResponse] = await Promise.all([
+            const [statsData, userResponse] = await Promise.all([
                 fetchSupplierStats(),
                 userApi.getAll()
             ]);
 
-            setSuppliers(Array.isArray(stats) ? stats : []);
+            setSuppliers(statsData.stats);
+            setDebugCount(statsData.totalProducts);
             setAllUsers(Array.isArray(userResponse.data) ? userResponse.data : []);
 
             // Filter only vendors
@@ -313,7 +316,7 @@ export const SupplierManagementModal: React.FC<SupplierManagementModalProps> = (
                                     {suppliers.length === 0 && (
                                         <tr>
                                             <td colSpan={4} className="px-6 py-8 text-center text-slate-500 italic">
-                                                {isLoading ? 'Loading...' : 'No price lists found.'}
+                                                {isLoading ? 'Loading...' : `No price lists found. (Total Products: ${debugCount ?? '?'})`}
                                             </td>
                                         </tr>
                                     )}

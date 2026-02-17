@@ -253,7 +253,8 @@ class ProductController {
 
         try {
             const stats = await ProductService.getSupplierStats();
-            res.json({ success: true, stats });
+            const totalProducts = await ProductService.getAllProducts(user).then(p => p.length);
+            res.json({ success: true, stats, totalProducts });
         } catch (error) {
             console.error('Failed to get supplier stats:', error);
             res.status(500).json({ error: 'Failed to fetch suppliers' });
