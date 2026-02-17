@@ -13,7 +13,7 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onAdd, onEdit, isDarkMode, isAdmin }) => {
-    const calc = formulas ? calculateFrontlinePrice(product, formulas) : { frontlinePrice: '0.00' };
+    const calc = formulas ? calculateFrontlinePrice(product, formulas) : { frontlinePrice: '0.00', formulaUsed: 'N/A' };
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-10 shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100 dark:border-slate-800 hover:border-rose-100 dark:hover:border-rose-900/50 hover:shadow-[0_12px_48px_-12px_rgba(225,29,72,0.08)] transition-all duration-500 group flex flex-col justify-between h-full">
@@ -122,9 +122,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                             {product.vintage || 'NV'}
                         </p>
                         {isAdmin && (
-                            <p className="text-[10px] font-bold text-rose-500 dark:text-rose-400 mt-1 uppercase tracking-wider">
-                                FOB: ${typeof product.fobCasePrice === 'number' ? product.fobCasePrice.toFixed(2) : product.fobCasePrice}
-                            </p>
+                            <div className="flex flex-col items-end">
+                                <p className="text-[10px] font-bold text-rose-500 dark:text-rose-400 mt-1 uppercase tracking-wider">
+                                    FOB: ${typeof product.fobCasePrice === 'number' ? product.fobCasePrice.toFixed(2) : product.fobCasePrice}
+                                </p>
+                                <p className="text-[9px] font-mono text-slate-400 mt-0.5" title="Pricing Formula Used">
+                                    Formula: {calc.formulaUsed || 'N/A'}
+                                </p>
+                            </div>
                         )}
                     </div>
                 </div>

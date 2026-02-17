@@ -84,7 +84,7 @@ export const calculateFrontlinePrice = (product: IProduct, formulas: IFormulas) 
         whlsBottle: whlsBottle.toFixed(2),
         whlsCase: whlsCase.toFixed(2),
         laidIn: laidIn.toFixed(2),
-        formulaUsed: productType.includes('spirit') ? 'spirits' : productType.includes('non-alc') || productType.includes('non alc') ? 'nonAlcoholic' : 'wine'
+        formulaUsed: selectedCategory // Return the ACTUALLY used category
     };
 };
 
