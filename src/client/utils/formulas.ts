@@ -11,13 +11,32 @@ export const calculateFrontlinePrice = (product: IProduct, formulas: IFormulas) 
     // Explicitly type formula to avoid index signature errors
     let formula = formulas.wine; // Default to wine
 
-    // Helper to check keywords in either field
-    const isType = (keywords: string[]) => keywords.some(k => productType.includes(k) || productName.includes(k));
+    // Helper to check keywords safely (word boundaries)
+    const isType = (keywords: string[]) => {
+        const text = `${productType} ${productName}`;
+        return keywords.some(k => {
+            const regex = new RegExp(`\\b${k.trim()}\\b`, 'i');
+            return regex.test(text);
+        });
+    };
+
+    let selectedCategory = 'wine';
 
     if (isType(['spirit', 'liquor', 'vodka', 'whiskey', 'whisky', 'bourbon', 'rum', 'gin', 'tequila', 'mezcal', 'brandy', 'cognac', 'amaro', 'vermouth'])) {
         formula = formulas.spirits;
-    } else if (isType(['non-alc', 'na ', 'juice', 'soda', 'non alc', 'water', 'tea', 'coffee'])) {
+        selectedCategory = 'spirits';
+    } else if (isType(['non-alc', 'na', 'juice', 'soda', 'non alc', 'water', 'tea', 'coffee'])) {
         formula = formulas.nonAlcoholic;
+        selectedCategory = 'nonAlcoholic';
+    }
+
+    // Debug Log for specific item or general errors
+    if (product.itemCode === 'MERO251' || productName.includes('mero')) {
+        console.log(`[Formulas] Pricing "${productName}" (${product.itemCode})`, {
+            type: productType,
+            category: selectedCategory,
+            formula: formula
+        });
     }
     // Else stays wine
 
