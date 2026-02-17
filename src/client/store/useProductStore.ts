@@ -230,7 +230,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
             return Array.isArray(response.data.stats) ? response.data.stats : [];
         } catch (error) {
             console.error('Failed to fetch supplier stats:', error);
-            return [];
+            throw error;
         }
     },
 

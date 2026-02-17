@@ -58,8 +58,9 @@ export const SupplierManagementModal: React.FC<SupplierManagementModalProps> = (
             setSupplierVendorMap(map);
 
             setError(null);
-        } catch (err) {
-            setError('Failed to load data.');
+        } catch (err: any) {
+            const msg = err.response?.data?.error || err.message || 'Failed to load data.';
+            setError(`Error: ${msg}`);
             console.error(err);
         } finally {
             setIsLoading(false);
