@@ -9,7 +9,7 @@ export const calculateFrontlinePrice = (product: IProduct, formulas: IFormulas) 
     if (!formulas || !formulas.wine) return {};
 
     // Explicitly type formula to avoid index signature errors
-    let formula = formulas.wine;
+    let formula = formulas.wine; // Default to wine
 
     // Helper to check keywords in either field
     const isType = (keywords: string[]) => keywords.some(k => productType.includes(k) || productName.includes(k));
@@ -19,6 +19,7 @@ export const calculateFrontlinePrice = (product: IProduct, formulas: IFormulas) 
     } else if (isType(['non-alc', 'na ', 'juice', 'soda', 'non alc', 'water', 'tea', 'coffee'])) {
         formula = formulas.nonAlcoholic;
     }
+    // Else stays wine
 
     // Parse bottle size (remove 'ml' and convert to number)
     const bottleSize = parseFloat(String(product.bottleSize).replace(/[^0-9.]/g, '')) || 750;
