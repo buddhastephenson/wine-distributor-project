@@ -26,7 +26,7 @@ interface ProductState {
     executeDeduplication: (groups: { winnerId: string, loserIds: string[] }[]) => Promise<{ merged: number, deleted: number }>;
 
     // Supplier Management
-    fetchSupplierStats: () => Promise<{ stats: { supplier: string; count: number }[], totalProducts: number }>;
+    fetchSupplierStats: () => Promise<{ supplier: string; count: number }[]>;
     renameSupplier: (oldName: string, newName: string) => Promise<{ productsUpdated: number; ordersUpdated: number }>;
     deleteSupplier: (name: string) => Promise<{ productsDeleted: number; ordersUpdated: number }>;
 }
@@ -227,8 +227,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     fetchSupplierStats: async () => {
         try {
             const response = await productApi.getSuppliers();
-            // @ts-ignore
-            return { stats: Array.isArray(response.data.stats) ? response.data.stats : [], totalProducts: response.data.totalProducts };
+            return Array.isArray(response.data.stats) ? response.data.stats : [];
         } catch (error) {
             console.error('Failed to fetch supplier stats:', error);
             throw error;
