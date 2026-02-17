@@ -60,10 +60,10 @@ export const ImportPage: React.FC = () => {
                 // But the User Type should be 'vendor' (or 'admin' if they act as one).
                 // Let's get ALL users that are type 'vendor' OR 'admin' (since admins can own products).
                 const vendorUsers = response.data
-                    .filter(u => u.type === 'vendor' || u.type === 'admin')
+                    .filter(u => u.type === 'vendor')
                     .sort((a, b) => a.username.localeCompare(b.username));
 
-                console.log('Fetched Vendor Users:', vendorUsers);
+                console.log('Fetched Vendor Users (Only Vendors):', vendorUsers);
                 setVendors(vendorUsers);
             } catch (err) {
                 console.error('Failed to fetch vendors:', err);
