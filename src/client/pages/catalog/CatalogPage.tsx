@@ -247,19 +247,11 @@ export const CatalogPage: React.FC = () => {
                 'Type': combined.productType || '',
                 'Frontline Bottle': combined.frontlinePrice || '',
                 'Frontline Case': combined.frontlineCase || '',
-                'SRP': combined.srp || '',
-                'Wholesale Bottle': combined.whlsBottle || '',
             };
 
             // Admin Only Columns
             if (user?.type === 'admin') {
                 exportItem['FOB Case'] = combined.fobCasePrice || '';
-                exportItem['Laid In'] = combined.laidIn || '';
-                exportItem['Wholesale Case'] = combined.whlsCase || '';
-                exportItem['Bank Fee'] = combined.bankFee || '';
-                exportItem['Landing Cost'] = combined.landingCost || '';
-                exportItem['Profit'] = combined.profit || '';
-                exportItem['Margin'] = combined.margin || '';
             }
 
             return exportItem;
