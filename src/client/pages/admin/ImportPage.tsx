@@ -45,6 +45,7 @@ export const ImportPage: React.FC = () => {
     const [selectedVendor, setSelectedVendor] = useState<string>('');
     const [isNewVendor, setIsNewVendor] = useState(false);
     const [newVendorName, setNewVendorName] = useState('');
+    const [defaultProductType, setDefaultProductType] = useState<string>('wine');
 
     // Fetch products and users (vendors) on mount
     useEffect(() => {
@@ -155,7 +156,7 @@ export const ImportPage: React.FC = () => {
             packSize: String(row[columnMapping['packSize']] || '12').trim(),
             fobCasePrice: parseFloat(String(row[columnMapping['fobCasePrice']] || '0').replace(/[^0-9.]/g, '')),
             supplier: String(row[columnMapping['supplier']] || '').trim(),
-            productType: String(row[columnMapping['productType']] || 'wine').trim(),
+            productType: String(row[columnMapping['productType']] || '').trim(), // Do not default to wine yet, check mapping
             country: String(row[columnMapping['country']] || '').trim(),
             region: String(row[columnMapping['region']] || '').trim(),
             appellation: String(row[columnMapping['appellation']] || '').trim(),
@@ -264,6 +265,15 @@ export const ImportPage: React.FC = () => {
         } else {
             // If file has no supplier column, inject the selected one
             productsToImport = previewData.map(p => ({ ...p, supplier: finalSupplier }));
+        }
+
+        // Apply Default Product Type if Type is missing in any product
+        // (Actually, if the column wasn't mapped, it's empty string now. If it was mapped but empty, it's empty string)
+        if (!columnMapping['productType'] || productsToImport.some(p => !p.productType)) {
+            productsToImport = productsToImport.map(p => ({
+                ...p,
+                productType: p.productType || defaultProductType
+            }));
         }
 
         if (productsToImport.length === 0) {
@@ -578,6 +588,29 @@ export const ImportPage: React.FC = () => {
                                             Warning: Importing will replace the entire catalog for this price list.
                                         </p>
                                     </div>
+
+                                    {/* Default Product Type Selection if Type Column NOT Mapped */}
+                                    {!columnMapping['productType'] && (
+                                        <div className="mt-6">
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                                Default Product Type
+                                                <span className="text-xs text-slate-400 font-normal ml-2">(Since 'Type' column was not mapped)</span>
+                                            </label>
+                                            <select
+                                                value={defaultProductType}
+                                                onChange={(e) => setDefaultProductType(e.target.value)}
+                                                className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
+                                            >
+                                                <option value="wine">Wine (Standard Formula)</option>
+                                                <option value="spirit">Spirits / High ABV</option>
+                                                <option value="non-alcoholic">Non-Alcoholic</option>
+                                                <option value="beer">Beer</option>
+                                            </select>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                This type determines which pricing formula is applied to all imported products.
+                                            </p>
+                                        </div>
+                                    )}
 
                                     <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-700">
                                         <button
