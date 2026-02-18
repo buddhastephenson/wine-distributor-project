@@ -15,8 +15,11 @@ const transporter = nodemailer.createTransport({
 });
 
 class AuthService {
-    async signup(userData: Partial<IUser>): Promise<IAuthResponse> {
-        const { username, password, email } = userData;
+    async signup(userData: Partial<IUser> & { role?: string }): Promise<IAuthResponse> {
+        const { username, password, email, type, role } = userData;
+
+        // Determine user type (role might be passed from frontend as 'role' or 'type')
+        const userType = type || role || 'customer';
 
         if (!username || !password || !email) {
             return { success: false, error: 'Missing required fields' };
@@ -46,7 +49,7 @@ class AuthService {
                 id: `user-${Date.now()}`,
                 username,
                 password: hashedPassword,
-                type: 'customer',
+                type: userType,
                 status: 'pending',
                 email
             });

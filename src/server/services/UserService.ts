@@ -82,18 +82,14 @@ class UserService {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // 3. Create User
-        // If role is 'vendor', we set type to 'vendor' initially.
-        // System will promote to 'admin' (Restricted) when a portfolio is assigned via Import.
-        let userType = role;
-        if (role === 'vendor') userType = 'vendor'; // Explicitly set 'vendor' type for clarity before assignment
-
+        // Directly use the role as the type. simplified.
         const newUser = await User.create({
             id: `user-${Date.now()}`,
             username,
             email,
             password: hashedPassword,
-            type: userType,
-            status: 'active', // Admin created users are active by default
+            type: role,
+            status: 'active',
             isSuperAdmin: false,
             vendors: []
         });
@@ -114,7 +110,7 @@ class UserService {
                 { id: vendorId },
                 {
                     $addToSet: { vendors: supplierName },
-                    $set: { type: 'admin', isSuperAdmin: false }
+                    $set: { type: 'vendor', isSuperAdmin: false } // Force type to 'vendor'
                 }
             );
             return { success: true, message: `Assigned "${supplierName}" to vendor and optimized permissions.` };
