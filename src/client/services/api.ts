@@ -56,7 +56,7 @@ export const productApi = {
     create: (data: Partial<IProduct>) => api.post<{ success: boolean; product: IProduct }>('/products', data),
     update: (id: string, updates: Partial<IProduct>) => api.patch<{ success: boolean; product: IProduct }>(`/products/${id}`, updates),
     delete: (id: string) => api.delete<{ success: boolean }>(`/products/${id}`),
-    import: (products: any[], supplier: string, vendorId?: string, newVendorName?: string) => api.post<{ success: boolean; stats: any }>('/products/import', { products, supplier, vendorId, newVendorName }),
+    import: (products: any[], supplier: string, vendorId?: string) => api.post<{ success: boolean; stats: any }>('/products/import', { products, supplier, vendorId }),
     scanDuplicates: () => api.get<{ success: boolean; duplicates: any[] }>('/products/deduplicate/scan'),
     executeDeduplication: (groups: { winnerId: string, loserIds: string[] }[]) => api.post<{ success: boolean; stats: { merged: number, deleted: number } }>('/products/deduplicate/execute', { groups }),
 
@@ -81,9 +81,10 @@ export const userApi = {
     toggleAccess: (id: string, accessRevoked: boolean) => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/access`, { accessRevoked }),
     updateRole: (id: string, type: 'admin' | 'customer' | 'vendor', vendors?: string[], isSuperAdmin?: boolean) => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/role`, { type, vendors, isSuperAdmin }),
     updateUsername: (id: string, username: string) => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/username`, { username }),
+    updateEmail: (id: string, email: string) => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/email`, { email }),
     updatePassword: (id: string, password: string) => api.patch<{ success: boolean; message: string }>(`/auth/users/${id}/password`, { password }),
     delete: (id: string) => api.delete<{ success: boolean }>(`/auth/users/${id}`),
-    quickCreate: (username: string) => api.post<IAuthResponse>('/auth/users/quick-create', { username }),
+    create: (data: { username: string; email: string; password: string; role: 'admin' | 'customer' | 'vendor' }) => api.post<{ success: boolean; user: IUser }>('/auth/users', data),
     updateStatus: (id: string, status: 'active' | 'pending' | 'rejected') => api.patch<{ success: boolean; user: IUser }>(`/auth/users/${id}/status`, { status }),
     assignSupplier: (supplierName: string, vendorId?: string) => api.post<{ success: boolean; message: string }>('/auth/users/assign-supplier', { supplierName, vendorId }),
 };

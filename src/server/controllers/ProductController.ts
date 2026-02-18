@@ -168,7 +168,7 @@ class ProductController {
             // Restricted admins can't assign arbitrary vendors? 
             // Currently they can only import for specific SUPPLIERS.
             // If they are managing a supplier, they should be able to assign the vendor who owns it?
-            // Let's allow them to set vendorId if passed.
+            // Let's allow them to set vendorId if passed (which would be themselves usually).
             if (vendorId) finalVendorId = vendorId;
 
         } else if (user?.type === 'vendor') {
@@ -183,7 +183,7 @@ class ProductController {
             if (!supplier) {
                 return res.status(400).json({ error: 'Supplier is required for bulk import' });
             }
-            // Use passed vendorId
+            // Use passed vendorId (must be existing user)
             if (vendorId) finalVendorId = vendorId;
         }
 
@@ -191,7 +191,7 @@ class ProductController {
             // Need to pass vendorId to service? Service bulkImport doesn't seem to take vendorId yet.
             // I need to update products array to include vendorId before passing to service, 
             // OR update service to accept it.
-            // Service.bulkImport(products, supplier) likely iterates and upserts.
+            // Service.bulkImport(products, supplier) now iterates and upserts.
             // Let's attach vendorId to each product in the array.
 
             const productsWithVendor = products.map((p: any) => ({
@@ -200,7 +200,8 @@ class ProductController {
                 supplier: finalSupplier // Ensure uniform supplier
             }));
 
-            const stats = await ProductService.bulkImport(productsWithVendor, finalSupplier);
+            // Call updated service signature (no newVendorName)
+            const stats = await ProductService.bulkImport(productsWithVendor, finalSupplier, finalVendorId);
             res.json({ success: true, stats });
         } catch (error: any) {
             console.error('Import failed:', error);

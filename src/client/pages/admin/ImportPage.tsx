@@ -43,37 +43,39 @@ export const ImportPage: React.FC = () => {
 
     const [vendors, setVendors] = useState<any[]>([]);
     const [selectedVendor, setSelectedVendor] = useState<string>('');
-    const [isNewVendor, setIsNewVendor] = useState(false);
-    const [newVendorName, setNewVendorName] = useState('');
     const [defaultProductType, setDefaultProductType] = useState<string>('wine');
 
     // Fetch products and users (vendors) on mount
     useEffect(() => {
         fetchProducts();
 
-        // Fetch users to find potential vendors
-        // Assuming we can access userApi here or just fetch users
         const fetchVendors = async () => {
             try {
                 const response = await userApi.getAll();
-                // Filter users who are vendors
-                // The 'vendors' field on a User object is actually a list of Supplier Names they manage.
-                // But the User Type should be 'vendor' (or 'admin' if they act as one).
-                // Let's get ALL users that are type 'vendor' OR 'admin' (since admins can own products).
-                const vendorUsers = response.data
-                    .filter(u => u.type === 'vendor')
+                // Filter for users who are explicitly 'vendor' (Restricted Admin)
+                // OR 'admin' users who have restricted 'vendors' list?
+                // The user said: "Vendor is created by an Admin as a User with Vendor credentials... type 'vendor'?"
+                // Our system uses type='admin' + vendors=[] for Restricted Vendor.
+                // Let's look for users who are NOT full admins (isSuperAdmin=false, type='admin', vendors.length > 0) OR type='vendor'.
+                // Actually, let's just show ALL users who are capable of being a vendor.
+                // But to be "Clean", let's just show users who have type='vendor' OR (type='admin' AND !isSuperAdmin AND vendors.length > 0)
+                // Wait, previous fix sets type='admin' for restricted vendors.
+                // Let's stick to: Users who are NOT Customers.
+                // Actually, the user wants "Vendor will show up". 
+                // Let's show all users of type 'vendor' or 'admin' (excluding Super Admin maybe? Or include them if they manage a portfolio).
+                // Let's keep it simple: Show all users that are NOT 'customer'.
+
+                const potentialVendors = response.data
+                    .filter(u => u.type === 'vendor' || (u.type === 'admin' && !u.isSuperAdmin))
                     .sort((a, b) => a.username.localeCompare(b.username));
 
-                console.log('Fetched Vendor Users (Only Vendors):', vendorUsers);
-                setVendors(vendorUsers);
+                setVendors(potentialVendors);
             } catch (err) {
                 console.error('Failed to fetch vendors:', err);
             }
         };
         fetchVendors();
-        // Actually, let's just do it in the next edit to be safe with imports.
-        // For now, let's initialize the state.
-    }, []);
+    }, [fetchProducts]);
 
     const handleDownloadTemplate = () => {
         const headers = SYSTEM_FIELDS.map(f => f.label);
@@ -232,17 +234,19 @@ export const ImportPage: React.FC = () => {
         }
 
         // Logic to validate supplier against vendor permissions
+        // Logic to validate supplier against vendor permissions
         const user = useAuthStore.getState().user;
-        if (user?.type === 'vendor') {
-            // Vendors can create/manage any portfolio name they want. 
-            // We no longer restrict them to the hardcoded 'vendors' list for IMPORTING.
-        } else if (user?.type === 'admin' && user.vendors && user.vendors.length > 0) {
-            // Restricted Admins must still match
+
+        // If user is Restriced Admin (Vendor), MUST match assigned portfolio
+        if (user?.type === 'admin' && user.vendors && user.vendors.length > 0) {
+            // They can only import if the selected supplier matches one of their assigned vendors
             if (!user.vendors.includes(finalSupplier)) {
-                setError(`You are not authorized to import products for "${finalSupplier}".`);
+                setError(`You are authorized for "${user.vendors.join(', ')}", but trying to import "${finalSupplier}".`);
                 return;
             }
         }
+        // If user is full Super Admin (no vendors restriction), they can import whatever.
+
 
         // Filter data for the selected supplier (in case file has mixed)
         // OR if user selected one, we assume they want to import ALL rows as that supplier?
@@ -286,7 +290,7 @@ export const ImportPage: React.FC = () => {
 
         try {
             // Use authenticated API service
-            const response = await productApi.import(productsToImport, finalSupplier, selectedVendor, isNewVendor ? newVendorName : undefined);
+            const response = await productApi.import(productsToImport, finalSupplier, selectedVendor);
 
             setUploadStats(response.data.stats);
             // Don't reset everything, show stats
@@ -470,55 +474,45 @@ export const ImportPage: React.FC = () => {
                                     </div>
 
                                     <div>
-                                        {/* Vendor Selection - Only show for Admins */}
-                                        {user?.type !== 'vendor' && (
+                                        {/* Vendor Selection - Only show for Super Admins */}
+                                        {((user?.type === 'admin' && !user.vendors?.length)) && (
                                             <>
                                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                                    Select Vendor (User)
+                                                    Assign to Vendor User
                                                     <span className="text-xs text-slate-400 font-normal ml-2">(Who manages this portfolio?)</span>
                                                 </label>
 
-                                                {!isNewVendor ? (
-                                                    <div className="mb-6">
-                                                        <select
-                                                            value={selectedVendor}
-                                                            onChange={(e) => {
-                                                                if (e.target.value === '___NEW___') {
-                                                                    setIsNewVendor(true);
-                                                                    setSelectedVendor('');
-                                                                } else {
-                                                                    setSelectedVendor(e.target.value);
-                                                                }
-                                                            }}
-                                                            className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
-                                                        >
-                                                            <option value="">-- Select Vendor --</option>
-                                                            {vendors.map(v => (
-                                                                <option key={v.id} value={v.id}>
-                                                                    {v.username}
-                                                                </option>
-                                                            ))}
-                                                            <option value="___NEW___" className="font-bold text-indigo-600">+ Create New Vendor User</option>
-                                                        </select>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex space-x-2 mb-6">
-                                                        <input
-                                                            type="text"
-                                                            value={newVendorName}
-                                                            onChange={(e) => setNewVendorName(e.target.value)}
-                                                            placeholder="Enter New Vendor Username"
-                                                            className="flex-1 rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
-                                                            autoFocus
-                                                        />
-                                                        <button
-                                                            onClick={() => { setIsNewVendor(false); setNewVendorName(''); }}
-                                                            className="text-slate-500 hover:text-slate-700 px-3 py-2 border rounded-lg"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                    </div>
-                                                )}
+                                                <div className="mb-6">
+                                                    <select
+                                                        value={selectedVendor}
+                                                        onChange={(e) => {
+                                                            const vId = e.target.value;
+                                                            setSelectedVendor(vId);
+                                                            // If we selected a vendor, check if they have strict portfolios
+                                                            const vendorUser = vendors.find(v => v.id === vId);
+                                                            if (vendorUser && vendorUser.vendors && vendorUser.vendors.length > 0) {
+                                                                // Pre-select the first one if only one
+                                                                if (vendorUser.vendors.length === 1) setSelectedSupplier(vendorUser.vendors[0]);
+                                                                else setSelectedSupplier('');
+                                                            } else {
+                                                                setSelectedSupplier('');
+                                                            }
+                                                        }}
+                                                        className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border"
+                                                    >
+                                                        <option value="">-- Select Vendor User --</option>
+                                                        {vendors.map(v => (
+                                                            <option key={v.id} value={v.id}>
+                                                                {v.username} {v.vendors?.length > 0 ? `(${v.vendors.join(', ')})` : '(No Portfolios)'}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        Select the User account that owns this portfolio.
+                                                        <br />
+                                                        <span className="italic">Note: Vendors must be created in the Users tab first.</span>
+                                                    </p>
+                                                </div>
                                             </>
                                         )}
 
@@ -538,29 +532,42 @@ export const ImportPage: React.FC = () => {
                                                         setSelectedSupplier(e.target.value);
                                                     }
                                                 }}
-                                                // Disable if user is restricted to fewer than 2 choices (and 1 is auto-selected)
-                                                disabled={(() => {
-                                                    if (user?.type === 'admin' && user?.vendors && user.vendors.length > 0) {
-                                                        return user.vendors.length <= 1;
-                                                    }
-                                                    return false;
-                                                })()}
                                                 className="w-full rounded-lg border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-3 py-2 border disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <option value="">-- Select Existing Price List --</option>
-                                                {/* Filter suppliers based on auth */}
-                                                {suppliers.filter(s => {
-                                                    // Admin restricted
-                                                    if (user?.type === 'admin' && user?.vendors && user.vendors.length > 0) {
-                                                        return user.vendors.includes(s);
-                                                    }
-                                                    // Vendor restricted - actually, let them see all their OWN portfolios
-                                                    // If we rely on 'suppliers' state which comes from products, it should only contain their products anyway.
-                                                    return true;
-                                                }).map(s => <option key={s} value={s}>{s}</option>)}
+                                                <option value="">-- Select Price List --</option>
 
-                                                {/* Always allow Vendors to add new, or Admins if not restricted */}
-                                                {(user?.type === 'vendor' || (!user?.vendors?.length)) && (
+                                                {/* Logic for Options:
+                                                    1. If Restricted Admin (User): Show ONLY their allowed portfolios.
+                                                    2. If Super Admin AND Selected Vendor User: Show ONLY that vendor's portfolios.
+                                                    3. If Super Admin AND No Vendor Selected: Show ALL portfolios? Or force selection?
+                                                */}
+                                                {(() => {
+                                                    // 1. Restricted Admin
+                                                    if (user?.type === 'admin' && user.vendors && user.vendors.length > 0) {
+                                                        return user.vendors.map((s: string) => <option key={s} value={s}>{s}</option>);
+                                                    }
+
+                                                    // 2. Super Admin with Selected Vendor
+                                                    if (selectedVendor) {
+                                                        const vendorUser = vendors.find(v => v.id === selectedVendor);
+                                                        if (vendorUser && vendorUser.vendors && vendorUser.vendors.length > 0) {
+                                                            return [
+                                                                ...vendorUser.vendors.map((s: string) => <option key={s} value={s}>{s}</option>),
+                                                                <option key="new" value="___NEW___" className="font-bold text-indigo-600">+ Add New Portfolio to User</option>
+                                                            ];
+                                                        } else {
+                                                            // Vendor has NO portfolios? Allow adding new.
+                                                            return <option value="___NEW___" className="font-bold text-indigo-600">+ Create First Portfolio for User</option>;
+                                                        }
+                                                    }
+
+                                                    // 3. Super Admin / No Vendor Selected (Scanning all products? or just empty)
+                                                    // Let's show existing suppliers from products as fallback, but really we want them to pick a user first.
+                                                    return suppliers.map((s: string) => <option key={s} value={s}>{s}</option>);
+                                                })()}
+
+                                                {/* General Add New Option (if not restricted) */}
+                                                {(!selectedVendor && (!user?.vendors || user.vendors.length === 0)) && (
                                                     <option value="___NEW___" className="font-bold text-indigo-600">+ Create New Price List Name</option>
                                                 )}
                                             </select>
@@ -626,10 +633,10 @@ export const ImportPage: React.FC = () => {
                                                 isUploading ||
                                                 (!selectedSupplier && !newSupplierName) ||
                                                 // If NOT vendor, must select vendor. If Vendor, valid.
-                                                (user?.type !== 'vendor' && !selectedVendor && !newVendorName)
+                                                (user?.type !== 'vendor' && !selectedVendor)
                                             }
                                             className={`py-2 px-6 rounded-xl flex items-center justify-center space-x-2 font-bold text-white transition-all shadow-md
-                                                ${isUploading || (!selectedSupplier && !newSupplierName) || (user?.type !== 'vendor' && !selectedVendor && !newVendorName) ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}
+                                                ${isUploading || (!selectedSupplier && !newSupplierName) || (user?.type !== 'vendor' && !selectedVendor) ? 'bg-slate-400 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-700'}
                                             `}
                                         >
                                             {isUploading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <span>Start Import</span>}

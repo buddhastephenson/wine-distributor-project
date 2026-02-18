@@ -41,6 +41,14 @@ class UserService {
         return await User.findOneAndUpdate({ id }, { username }, { new: true });
     }
 
+    async updateEmail(id: string, email: string): Promise<IUser | null> {
+        const existing = await User.findOne({ email: { $regex: new RegExp(`^${email}$`, 'i') } });
+        if (existing && existing.id !== id) {
+            throw new Error('Email already exists');
+        }
+        return await User.findOneAndUpdate({ id }, { email }, { new: true });
+    }
+
     async updatePassword(id: string, password: string): Promise<IUser | null> {
         const hashedPassword = await bcrypt.hash(password, 10);
         return await User.findOneAndUpdate({ id }, { password: hashedPassword }, { new: true });
@@ -58,6 +66,41 @@ class UserService {
         return true;
     }
 
+    async createUser(userData: { username: string; email: string; password: string; role: 'admin' | 'customer' | 'vendor' }): Promise<IUser> {
+        const { username, email, password, role } = userData;
+
+        // 1. Check for existing
+        const existing = await User.findOne({
+            $or: [
+                { username: { $regex: new RegExp(`^${username}$`, 'i') } },
+                { email: { $regex: new RegExp(`^${email}$`, 'i') } }
+            ]
+        });
+        if (existing) throw new Error('Username or Email already exists');
+
+        // 2. Hash Password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // 3. Create User
+        // If role is 'vendor', we set type to 'vendor' initially.
+        // System will promote to 'admin' (Restricted) when a portfolio is assigned via Import.
+        let userType = role;
+        if (role === 'vendor') userType = 'vendor'; // Explicitly set 'vendor' type for clarity before assignment
+
+        const newUser = await User.create({
+            id: `user-${Date.now()}`,
+            username,
+            email,
+            password: hashedPassword,
+            type: userType,
+            status: 'active', // Admin created users are active by default
+            isSuperAdmin: false,
+            vendors: []
+        });
+
+        return newUser;
+    }
+
     async assignSupplier(supplierName: string, vendorId?: string): Promise<{ success: boolean; message: string }> {
         // 1. Remove this supplier from ALL vendors to ensure exclusivity
         await User.updateMany(
@@ -69,9 +112,12 @@ class UserService {
         if (vendorId) {
             await User.findOneAndUpdate(
                 { id: vendorId },
-                { $addToSet: { vendors: supplierName } }
+                {
+                    $addToSet: { vendors: supplierName },
+                    $set: { type: 'admin', isSuperAdmin: false }
+                }
             );
-            return { success: true, message: `Assigned "${supplierName}" to vendor.` };
+            return { success: true, message: `Assigned "${supplierName}" to vendor and optimized permissions.` };
         }
 
         return { success: true, message: `Unassigned "${supplierName}".` };

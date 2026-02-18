@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { IUser } from '../../../shared/types'; // Correct relative path
 import { Button } from '../shared/Button';
 import { ConfirmationModal } from '../shared/ConfirmationModal';
-import { Edit2, Lock, Unlock, Trash2, UserCheck, Search, Key, Check } from 'lucide-react';
+import { Edit2, Lock, Unlock, Trash2, UserCheck, Search, Key, Check, Shield, PenTool } from 'lucide-react';
 import { userApi } from '../../services/api';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -135,8 +135,12 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                 vendors = [];
             } else if (selectedRoleType === 'vendor') {
                 type = 'admin';
-                // Auto-assign the username as the vendor/supplier
-                vendors = [selectedUserForRole.username];
+                // Preserve existing vendors if set, otherwise default to username
+                if (selectedUserForRole.vendors && selectedUserForRole.vendors.length > 0) {
+                    vendors = selectedUserForRole.vendors;
+                } else {
+                    vendors = [selectedUserForRole.username];
+                }
             }
 
             await userApi.updateRole(selectedUserForRole.id, type, vendors, selectedUserForRole.isSuperAdmin);
@@ -150,18 +154,38 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
         }
     };
 
-    // Quick Add Modal State
-    const [showQuickAddModal, setShowQuickAddModal] = useState(false);
-    const [newUsername, setNewUsername] = useState('');
+    // Create User Modal State
+    const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+    const [createUserForm, setCreateUserForm] = useState({
+        username: '',
+        email: '',
+        password: '',
+        role: 'customer' as 'admin' | 'customer' | 'vendor'
+    });
 
-    const handleQuickAdd = async () => {
-        if (!newUsername.trim()) return;
+    const generatePassword = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        let pass = '';
+        for (let i = 0; i < 12; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setCreateUserForm(prev => ({ ...prev, password: pass }));
+    };
+
+    const handleCreateUser = async () => {
+        const { username, email, password, role } = createUserForm;
+        if (!username || !email || !password) {
+            alert('Please fill in all fields.');
+            return;
+        }
+
         setIsLoading('new-user');
         try {
-            await userApi.quickCreate(newUsername);
-            setShowQuickAddModal(false);
-            setNewUsername('');
+            await userApi.create({ username, email, password, role });
+            setShowCreateUserModal(false);
+            setCreateUserForm({ username: '', email: '', password: '', role: 'customer' });
             onRefresh();
+            alert(`User ${username} created successfully!`);
         } catch (error: any) {
             console.error('Failed to create user', error);
             alert(error.response?.data?.error || 'Failed to create user');
@@ -196,6 +220,43 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
         }
     };
 
+    // Edit Details Modal State
+    const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
+    const [editDetailsForm, setEditDetailsForm] = useState({ id: '', username: '', email: '' });
+
+    const handleEditDetailsClick = (user: IUser) => {
+        setEditDetailsForm({ id: user.id, username: user.username, email: user.email });
+        setShowEditDetailsModal(true);
+    };
+
+    const handleUpdateDetails = async () => {
+        const { id, username, email } = editDetailsForm;
+        if (!username || !email) return;
+
+        setIsLoading(id);
+        try {
+            const currentUserState = users.find(u => u.id === id);
+            if (!currentUserState) return;
+
+            if (username !== currentUserState.username) {
+                await userApi.updateUsername(id, username);
+            }
+            if (email !== currentUserState.email) {
+                await userApi.updateEmail(id, email);
+            }
+
+            alert('User details updated successfully');
+            setShowEditDetailsModal(false);
+            onRefresh();
+
+        } catch (error: any) {
+            console.error('Update failed', error);
+            alert(error.response?.data?.error || 'Failed to update details');
+        } finally {
+            setIsLoading(null);
+        }
+    };
+
     return (
         <div className="flex flex-col">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-4 px-6 lg:px-8 gap-4">
@@ -221,32 +282,72 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                         />
                         <span>Show Disabled Users</span>
                     </label>
-                    <Button onClick={() => setShowQuickAddModal(true)}>
-                        + Add Customer
+                    <Button onClick={() => setShowCreateUserModal(true)}>
+                        + Add User
                     </Button>
                 </div>
             </div>
 
-            {/* Quick Add Modal */}
-            {showQuickAddModal && (
+            {/* Create User Modal */}
+            {showCreateUserModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white p-6 rounded-lg w-96">
-                        <h3 className="text-lg font-bold mb-4">Quick Add Customer</h3>
-                        <p className="text-sm text-gray-500 mb-4">
-                            Create a customer account instantly. Password will be set to the username.
-                            A placeholder email will be generated.
-                        </p>
-                        <input
-                            type="text"
-                            placeholder="Username / Establishment"
-                            className="w-full border rounded p-2 mb-4"
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                        />
-                        <div className="flex justify-end space-x-2">
-                            <Button variant="secondary" onClick={() => setShowQuickAddModal(false)}>Cancel</Button>
-                            <Button onClick={handleQuickAdd} disabled={isLoading === 'new-user'}>
-                                {isLoading === 'new-user' ? 'Creating...' : 'Create'}
+                    <div className="bg-white p-6 rounded-lg w-96 max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-lg font-bold mb-4">Create New User</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Username / Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full border rounded p-2 mt-1"
+                                    value={createUserForm.username}
+                                    onChange={(e) => setCreateUserForm({ ...createUserForm, username: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Email</label>
+                                <input
+                                    type="email"
+                                    className="w-full border rounded p-2 mt-1"
+                                    value={createUserForm.email}
+                                    onChange={(e) => setCreateUserForm({ ...createUserForm, email: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Role</label>
+                                <select
+                                    className="w-full border rounded p-2 mt-1"
+                                    value={createUserForm.role}
+                                    onChange={(e) => setCreateUserForm({ ...createUserForm, role: e.target.value as any })}
+                                >
+                                    <option value="customer">Customer</option>
+                                    <option value="vendor">Vendor</option>
+                                    <option value="admin">Admin (Staff)</option>
+                                </select>
+                                {createUserForm.role === 'vendor' && (
+                                    <p className="text-xs text-indigo-600 mt-1">
+                                        Vendors will be created with restricted access. Assign portfolios via the Import page.
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Password</label>
+                                <div className="flex space-x-2">
+                                    <input
+                                        type="text"
+                                        className="w-full border rounded p-2 mt-1"
+                                        value={createUserForm.password}
+                                        onChange={(e) => setCreateUserForm({ ...createUserForm, password: e.target.value })}
+                                    />
+                                    <Button variant="secondary" onClick={generatePassword} className="mt-1" type="button">Gen</Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end space-x-2 mt-6">
+                            <Button variant="secondary" onClick={() => setShowCreateUserModal(false)}>Cancel</Button>
+                            <Button onClick={handleCreateUser} disabled={isLoading === 'new-user'}>
+                                {isLoading === 'new-user' ? 'Creating...' : 'Create User'}
                             </Button>
                         </div>
                     </div>
@@ -436,7 +537,7 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                             )}
 
                                             {/* Password Reset - Admins can reset Customers; Super Amins can reset anyone */}
-                                            {currentUser?.type === 'admin' && (isSuperAdmin || user.type === 'customer') && (
+                                            {currentUser?.type === 'admin' && (isSuperAdmin || user.type === 'customer') && !isSuperAdmin && (
                                                 <button
                                                     onClick={() => handlePasswordResetClick(user)}
                                                     className="text-amber-600 hover:text-amber-900 mr-4"
@@ -447,24 +548,40 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                             )}
 
                                             {isSuperAdmin && (
-                                                <>
+                                                <div className="flex items-center justify-end space-x-4">
+                                                    <button
+                                                        onClick={() => handleEditDetailsClick(user)}
+                                                        className="text-blue-600 hover:text-blue-900"
+                                                        title="Edit Details (Username/Email)"
+                                                    >
+                                                        <Edit2 size={18} />
+                                                    </button>
                                                     <button
                                                         onClick={() => handleEditRole(user)}
                                                         disabled={isLoading === user.id}
-                                                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                                        className="text-indigo-600 hover:text-indigo-900"
                                                         title="Edit Role & Permissions"
                                                     >
-                                                        <Edit2 size={18} />
+                                                        <Shield size={18} />
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handlePasswordResetClick(user)}
+                                                        className="text-orange-600 hover:text-orange-900"
+                                                        title="Reset Password"
+                                                    >
+                                                        <Key size={18} />
                                                     </button>
 
                                                     <button
                                                         onClick={() => handleToggleAccess(user)}
                                                         disabled={isLoading === user.id}
-                                                        className={`text-indigo-600 hover:text-indigo-900 mr-4 ${isLoading === user.id ? 'opacity-50' : ''}`}
+                                                        className={`${user.accessRevoked ? 'text-emerald-600 hover:text-emerald-900' : 'text-amber-600 hover:text-amber-900'}`}
                                                         title={user.accessRevoked ? "Restore Access" : "Revoke Access"}
                                                     >
                                                         {user.accessRevoked ? <Unlock size={18} /> : <Lock size={18} />}
                                                     </button>
+
                                                     <button
                                                         onClick={() => handleDeleteClick(user)}
                                                         disabled={isLoading === user.id}
@@ -473,11 +590,11 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>
-                                                </>
+                                                </div>
                                             )}
-                                            {user.type !== 'admin' && (
+                                            {user.type !== 'admin' && onImpersonate && (
                                                 <button
-                                                    onClick={() => onImpersonate && onImpersonate(user)}
+                                                    onClick={() => onImpersonate(user)}
                                                     className="text-blue-600 hover:text-blue-900 ml-4"
                                                     title="Login As User"
                                                 >
@@ -492,6 +609,41 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                     </div>
                 </div>
             </div>
+
+            {/* Edit User Details Modal */}
+            {showEditDetailsModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-white p-6 rounded-lg w-96 max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-lg font-bold mb-4">Edit User Details</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Username</label>
+                                <input
+                                    type="text"
+                                    className="w-full border rounded p-2 mt-1"
+                                    value={editDetailsForm.username}
+                                    onChange={(e) => setEditDetailsForm({ ...editDetailsForm, username: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Email</label>
+                                <input
+                                    type="email"
+                                    className="w-full border rounded p-2 mt-1"
+                                    value={editDetailsForm.email}
+                                    onChange={(e) => setEditDetailsForm({ ...editDetailsForm, email: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end space-x-2 mt-6">
+                            <Button variant="secondary" onClick={() => setShowEditDetailsModal(false)}>Cancel</Button>
+                            <Button onClick={handleUpdateDetails} disabled={!!isLoading}>
+                                {isLoading ? 'Updating...' : 'Save Changes'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

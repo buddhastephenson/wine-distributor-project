@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useProductStore } from '../../store/useProductStore';
-import { Settings, Save, RefreshCw, X } from 'lucide-react';
+import { Settings, Save, RefreshCw, X, List } from 'lucide-react';
 import { IFormulas, IFormula } from '../../../shared/types';
 import { DuplicateReviewModal } from '../../components/admin/DuplicateReviewModal';
 import { SupplierManagementModal } from '../../components/admin/SupplierManagementModal';
@@ -203,11 +203,13 @@ export const SettingsPage: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex space-x-3 z-10">
+
+
                     <button
                         onClick={() => setIsSupplierModalOpen(true)}
                         className="px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors flex items-center border border-indigo-100 dark:border-indigo-900/30"
                     >
-                        <Settings className="w-4 h-4 mr-2" />
+                        <List className="w-4 h-4 mr-2" />
                         Manage Price Lists
                     </button>
 

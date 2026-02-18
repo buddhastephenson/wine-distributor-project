@@ -13,9 +13,17 @@ class ProductService {
         let query: any = {};
 
         // Filter for Vendor Admins
-        if (user && user.type === 'admin' && user.vendors && user.vendors.length > 0) {
+        if (user && (user.type === 'admin' || user.type === 'vendor') && user.vendors && user.vendors.length > 0) {
             // Only show products where supplier is in their allowed list
-            query.supplier = { $in: user.vendors };
+            if (user.type === 'vendor') {
+                // Vendors see assigned suppliers OR products they created/own directly
+                query.$or = [
+                    { supplier: { $in: user.vendors } },
+                    { vendor: user.id }
+                ];
+            } else {
+                query.supplier = { $in: user.vendors };
+            }
         } else if (user && user.type === 'vendor') {
             // Vendors only see products they own
             query.vendor = user.id;
@@ -52,52 +60,35 @@ class ProductService {
 
 
 
-    async bulkImport(products: IProduct[], supplier: string, vendorId?: string, newVendorName?: string): Promise<{ added: number, updated: number, deleted: number, kept: number, supplier: string }> {
+    async bulkImport(products: IProduct[], supplier: string, vendorId?: string): Promise<{ added: number, updated: number, deleted: number, kept: number, supplier: string }> {
 
         // --- VENDOR ASSOCIATION LOGIC ---
-        if (vendorId || newVendorName) {
-            console.log(`Processing Vendor Association: ID=${vendorId}, NewName=${newVendorName}`);
-            if (newVendorName) {
-                // Create New Vendor User
-                try {
-                    const result = await AuthService.quickCreateCustomer(newVendorName);
-                    if (result.success && result.user) {
-                        console.log(`Created new vendor user: ${result.user.username} (${result.user.id})`);
-                        // Promote to Admin/Vendor and assign supplier
-                        await User.findOneAndUpdate(
-                            { id: result.user.id },
-                            {
-                                type: 'admin',
-                                vendors: [supplier]
-                            }
-                        );
-                        console.log(`Promoted ${result.user.username} to Admin with vendor ${supplier}`);
-                    } else {
-                        console.error(`Failed to create new vendor user: ${result.error}`);
-                        throw new Error(`Failed to create vendor: ${result.error}`);
-                    }
-                } catch (e: any) {
-                    console.error('Vendor creation error:', e);
-                    throw new Error(`Vendor creation failed: ${e.message}`);
-                }
-            } else if (vendorId) {
-                // Update Existing Vendor
-                try {
-                    const user = await User.findOne({ id: vendorId });
-                    if (user) {
-                        // Add supplier if not present
-                        if (!user.vendors) user.vendors = [];
-                        if (!user.vendors.includes(supplier)) {
-                            user.vendors.push(supplier);
-                            await user.save();
-                            console.log(`Added supplier ${supplier} to existing vendor ${user.username}`);
+        if (vendorId) {
+            console.log(`Processing Vendor Association: ID=${vendorId}`);
+            // Update Existing Vendor User
+            try {
+                const user = await User.findOne({ id: vendorId });
+                if (user) {
+                    // Add supplier if not present
+                    if (!user.vendors) user.vendors = [];
+                    if (!user.vendors.includes(supplier)) {
+                        user.vendors.push(supplier);
+                        // Ensure they are promoted to restricted admin (Vendor) if not already
+                        // logic: if they are being assigned a portfolio, they must be a vendor type.
+                        // User said: "Vendor is created by an Admin as a User with Vendor credentials"
+                        // We'll enforce the restricted admin structure just to be safe so permissions work.
+                        if (user.type !== 'admin' || user.isSuperAdmin) {
+                            user.type = 'admin';
+                            user.isSuperAdmin = false;
                         }
-                    } else {
-                        console.warn(`Vendor ID ${vendorId} not found`);
+                        await user.save();
+                        console.log(`Associated supplier ${supplier} to existing vendor user ${user.username}`);
                     }
-                } catch (e) {
-                    console.error('Error updating existing vendor:', e);
+                } else {
+                    console.warn(`Vendor User ID ${vendorId} not found`);
                 }
+            } catch (e) {
+                console.error('Error updating existing vendor association:', e);
             }
         }
         // --------------------------------
@@ -240,11 +231,11 @@ class ProductService {
     async getSupplierStats(): Promise<{ supplier: string, count: number }[]> {
         // Aggregate products by supplier to get counts
         const stats = await Product.aggregate([
-            { $group: { _id: "$supplier", count: { $sum: 1 } } },
+            { $group: { _id: { $ifNull: ["$supplier", ""] }, count: { $sum: 1 } } },
             { $sort: { _id: 1 } },
             { $project: { supplier: "$_id", count: 1, _id: 0 } }
         ]);
-        return stats.filter(s => s.supplier); // Filter out null/empty suppliers if any
+        return stats;
     }
 
     async renameSupplier(oldName: string, newName: string): Promise<{ productsUpdated: number, ordersUpdated: number }> {

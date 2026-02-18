@@ -13,17 +13,20 @@ class UserController {
         }
     }
 
-    async quickCreate(req: Request, res: Response) {
-        console.log('UserController.quickCreate called with body:', req.body);
+    async createUser(req: Request, res: Response) {
         try {
-            const { username } = req.body;
-            const result = await AuthService.quickCreateCustomer(username);
-            if (!result.success) {
-                return res.status(400).json(result);
+            const { username, email, password, role } = req.body;
+
+            if (!username || !email || !password || !role) {
+                return res.status(400).json({ error: 'All fields are required (username, email, password, role)' });
             }
-            res.json(result);
-        } catch (error) {
-            res.status(500).json({ error: 'Internal Server Error' });
+
+            const user = await UserService.createUser({ username, email, password, role });
+            res.json({ success: true, user });
+        } catch (error: any) {
+            console.error('Create User Error:', error);
+            const status = error.message.includes('exists') ? 409 : 500;
+            res.status(status).json({ error: error.message });
         }
     }
 
@@ -73,6 +76,24 @@ class UserController {
             res.json({ success: true, user });
         } catch (error: any) {
             if (error.message === 'Username already exists') {
+                return res.status(400).json({ error: error.message });
+            }
+            res.status(500).json({ error: 'Update failed' });
+        }
+    }
+
+    async updateEmail(req: Request, res: Response) {
+        const { id } = req.params;
+        const { email } = req.body;
+
+        if (!email) return res.status(400).json({ error: 'Email is required' });
+
+        try {
+            const user = await UserService.updateEmail(id as string, email);
+            if (!user) return res.status(404).json({ error: 'User not found' });
+            res.json({ success: true, user });
+        } catch (error: any) {
+            if (error.message === 'Email already exists') {
                 return res.status(400).json({ error: error.message });
             }
             res.status(500).json({ error: 'Update failed' });

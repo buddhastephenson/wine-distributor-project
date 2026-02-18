@@ -6,8 +6,8 @@ const router = Router();
 // GET /api/auth/users
 router.get('/', UserController.getAllUsers.bind(UserController));
 
-// POST /api/auth/users/quick-create
-router.post('/quick-create', UserController.quickCreate.bind(UserController));
+// POST /api/auth/users
+router.post('/', UserController.createUser.bind(UserController));
 
 // PATCH /api/auth/users/:id/access
 router.patch('/:id/access', UserController.toggleAccess.bind(UserController));
@@ -17,6 +17,9 @@ router.patch('/:id/role', UserController.updateUserRole.bind(UserController));
 
 // PATCH /api/auth/users/:id/username
 router.patch('/:id/username', UserController.updateUsername.bind(UserController));
+
+// PATCH /api/auth/users/:id/email
+router.patch('/:id/email', UserController.updateEmail.bind(UserController));
 
 // PATCH /api/auth/users/:id/password
 router.patch('/:id/password', UserController.updatePassword.bind(UserController));
