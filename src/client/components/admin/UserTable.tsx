@@ -124,7 +124,7 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
         setIsLoading(selectedUserForRole.id);
 
         try {
-            let type: 'customer' | 'admin' = 'customer';
+            let type: 'customer' | 'admin' | 'vendor' = 'customer';
             let vendors: string[] = [];
 
             if (selectedRoleType === 'customer') {
@@ -134,7 +134,7 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onRefresh, onImpers
                 type = 'admin';
                 vendors = [];
             } else if (selectedRoleType === 'vendor') {
-                type = 'admin';
+                type = 'vendor';
                 // Preserve existing vendors if set, otherwise default to username
                 if (selectedUserForRole.vendors && selectedUserForRole.vendors.length > 0) {
                     vendors = selectedUserForRole.vendors;

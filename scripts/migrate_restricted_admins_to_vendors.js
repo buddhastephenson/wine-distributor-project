@@ -15,11 +15,10 @@ async function run() {
         await mongoose.connect(MONGO_URI);
         console.log('Connected to DB');
 
-        // Find Restricted Admins (who should be Vendors)
-        // Criteria: type: 'admin' AND isSuperAdmin: false
+        // Find users who are type='admin' AND have vendors > 0
         const restrictedAdmins = await User.find({
             type: 'admin',
-            isSuperAdmin: false
+            vendors: { $exists: true, $not: { $size: 0 } }
         });
 
         console.log(`Found ${restrictedAdmins.length} users to migrate to 'vendor' type.`);
