@@ -43,7 +43,7 @@ export const SupplierManagementModal: React.FC<SupplierManagementModalProps> = (
 
             // Filter only vendors
             const users = Array.isArray(userResponse.data) ? userResponse.data : [];
-            const vendorUsers = users.filter(u => u.type === 'vendor' || (u.type === 'admin' && !u.isSuperAdmin));
+            const vendorUsers = users.filter(u => u.type === 'vendor');
             setVendors(vendorUsers);
 
             // Build map: which vendor owns which supplier

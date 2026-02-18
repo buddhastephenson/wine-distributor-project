@@ -11,7 +11,7 @@ async function run() {
         console.log('Connected to DB');
 
         const users = await User.find({
-            username: /Matt/i
+            username: /Louis/i
         });
 
         console.log('--- Debug User Permissions ---');

@@ -66,7 +66,7 @@ export const ImportPage: React.FC = () => {
                 // Let's keep it simple: Show all users that are NOT 'customer'.
 
                 const potentialVendors = response.data
-                    .filter(u => u.type === 'vendor' || (u.type === 'admin' && !u.isSuperAdmin))
+                    .filter(u => u.type === 'vendor')
                     .sort((a, b) => a.username.localeCompare(b.username));
 
                 setVendors(potentialVendors);
