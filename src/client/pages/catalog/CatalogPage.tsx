@@ -70,16 +70,23 @@ export const CatalogPage: React.FC = () => {
     }, [allowedProducts]);
 
 
+    // Helper for accent-insensitive search
+    const normalizeText = (text: string | undefined) => {
+        if (!text) return '';
+        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    };
+
     // Filter Products
     const filteredProducts = useMemo(() => {
         return allowedProducts.filter(product => {
             // Search Term
-            const searchLower = searchTerm.toLowerCase();
+            const searchNormalized = normalizeText(searchTerm);
+
             const matchesSearch = !searchTerm ||
-                (product.productName?.toLowerCase().includes(searchLower)) ||
-                (product.producer?.toLowerCase().includes(searchLower)) ||
-                (product.itemCode?.toLowerCase().includes(searchLower)) ||
-                (product.vintage?.toString().includes(searchLower));
+                normalizeText(product.productName).includes(searchNormalized) ||
+                normalizeText(product.producer).includes(searchNormalized) ||
+                normalizeText(product.itemCode).includes(searchNormalized) ||
+                normalizeText(product.vintage?.toString()).includes(searchNormalized);
 
             if (!matchesSearch) return false;
 
