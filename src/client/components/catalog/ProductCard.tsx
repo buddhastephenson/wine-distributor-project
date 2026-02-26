@@ -109,8 +109,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
 
                     {/* Legacy/Top-Level Dynamic Fields */}
                     {Object.entries(product).map(([key, value]) => {
-                        const standardFields = ['id', 'itemCode', 'producer', 'productName', 'vintage', 'packSize', 'bottleSize', 'productType', 'fobCasePrice', 'productLink', 'supplier', 'uploadDate', 'frontlinePrice', 'frontlineCase', 'srp', 'whlsBottle', 'whlsCase', 'laidIn', 'formulaUsed', 'country', 'region', 'appellation', 'grapeVariety', 'extendedData'];
-                        if (standardFields.includes(key) || !value || typeof value === 'object') return null;
+                        const standardFields = ['id', 'itemCode', 'producer', 'productName', 'vintage', 'packSize', 'bottleSize', 'productType', 'fobCasePrice', 'productLink', 'supplier', 'uploadDate', 'frontlinePrice', 'frontlineCase', 'srp', 'whlsBottle', 'whlsCase', 'laidIn', 'formulaUsed', 'country', 'region', 'appellation', 'grapeVariety', 'extendedData', 'lastEditedBy', 'lastEditedAt', '_id'];
+                        // Also exclude keys that are already in extendedData to prevent duplicates
+                        if (standardFields.includes(key) || (product.extendedData && key in product.extendedData) || !value || typeof value === 'object') return null;
                         return (
                             <span key={key} className="inline-flex items-center px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tight bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-100 dark:border-slate-700 shadow-sm">
                                 <span className="text-slate-300 dark:text-slate-600 mr-2">{key}:</span> <span className="text-slate-600 dark:text-slate-300">{String(value)}</span>
