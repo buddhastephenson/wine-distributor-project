@@ -74,7 +74,7 @@ Replace `YourPDFFile.pdf` with your actual PDF filename.
 
 ## What Gets Created
 
-When you drop `Louis_Dressner_Jan_2026.pdf` onto the app:
-- Creates: `Louis_Dressner_Jan_2026_converted.xlsx` in the same folder
+When you drop `Louis_Dressner_Sample.pdf` onto the app:
+- Creates: `Louis_Dressner_Sample_converted.xlsx` in the same folder
 - Opens Excel file automatically
 - Ready to upload to AOC Wines system!

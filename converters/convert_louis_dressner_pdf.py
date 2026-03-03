@@ -156,7 +156,7 @@ def main():
     if len(sys.argv) != 3:
         print("Usage: python3 convert_louis_dressner_pdf.py input.pdf output.xlsx")
         print("\nExample:")
-        print("  python3 convert_louis_dressner_pdf.py Louis_Dressner_Jan_2026.pdf LouisDressner.xlsx")
+        print("  python3 convert_louis_dressner_pdf.py Louis_Dressner_Sample.pdf LouisDressner.xlsx")
         sys.exit(1)
     
     input_pdf = sys.argv[1]

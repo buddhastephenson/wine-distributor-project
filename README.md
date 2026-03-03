@@ -15,7 +15,6 @@ wine-distributor-project/
 │   ├── MAC_INSTALLATION.md            # Mac app setup guide
 │   └── README.md                      # This file
 └── data/
-    └── Louis_Dressner_Jan_2026.xlsx   # Sample price list
 ```
 
 ## 🚀 Features

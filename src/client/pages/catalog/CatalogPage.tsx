@@ -261,6 +261,36 @@ export const CatalogPage: React.FC = () => {
                 exportItem['FOB Case'] = combined.fobCasePrice || '';
             }
 
+            // Robust Stock Status extraction
+            // First check root property
+            let stockStatus = combined.stockStatus || combined.stock || combined.status || combined['Stock Status'] || combined['Stock'] || '';
+
+            // Check extendedData inside explicitly
+            if (!stockStatus && combined.extendedData) {
+                const extKeys = Object.keys(combined.extendedData);
+                const matchKey = extKeys.find(k => {
+                    const lower = k.toLowerCase();
+                    return lower.includes('stock') || lower.includes('allocated');
+                });
+                if (matchKey) {
+                    stockStatus = combined.extendedData[matchKey];
+                }
+            }
+
+            // Finally, check ANY root property not matching standard fields that might contain stock
+            if (!stockStatus) {
+                const rootKeys = Object.keys(combined);
+                const matchKey = rootKeys.find(k => {
+                    const lower = k.toLowerCase();
+                    return lower.includes('stock status') || lower === 'stock' || lower === 'status' || lower === 'allocated';
+                });
+                if (matchKey) {
+                    stockStatus = combined[matchKey];
+                }
+            }
+
+            exportItem['Stock Status'] = stockStatus;
+
             return exportItem;
         });
         exportProductsToExcel(exportData, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
