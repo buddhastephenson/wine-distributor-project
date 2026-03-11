@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { TaxonomySidebar } from '../../components/catalog/TaxonomySidebar';
 import { ProductGrid } from '../../components/catalog/ProductGrid';
 import { ProductEditModal } from '../../components/catalog/ProductEditModal';
+import { ProductOrderHistoryModal } from '../../components/catalog/ProductOrderHistoryModal';
 import { LayoutGrid, List, CheckCircle, Download, Plus } from 'lucide-react';
 import { calculateFrontlinePrice, parseVolumeToMl } from '../../utils/formulas';
 import { exportProductsToExcel } from '../../utils/export';
@@ -24,6 +25,8 @@ export const CatalogPage: React.FC = () => {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [editingProduct, setEditingProduct] = useState<IProduct | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [selectedProductForHistory, setSelectedProductForHistory] = useState<IProduct | null>(null);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const navigate = useNavigate();
 
     // Fetch Data on Mount
@@ -319,6 +322,11 @@ export const CatalogPage: React.FC = () => {
         setIsEditModalOpen(true);
     };
 
+    const handleViewOrders = (product: IProduct) => {
+        setSelectedProductForHistory(product);
+        setIsHistoryModalOpen(true);
+    };
+
     const handleSaveEdit = () => {
         fetchProducts(); // Refresh list to get updated data and recalculate prices
         setSuccessMessage(`Product updated successfully.`);
@@ -335,6 +343,14 @@ export const CatalogPage: React.FC = () => {
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={handleSaveEdit}
                     suppliers={uniqueSuppliers}
+                />
+            )}
+
+            {isHistoryModalOpen && selectedProductForHistory && (
+                <ProductOrderHistoryModal
+                    product={selectedProductForHistory}
+                    isOpen={isHistoryModalOpen}
+                    onClose={() => setIsHistoryModalOpen(false)}
                 />
             )}
 
@@ -419,6 +435,7 @@ export const CatalogPage: React.FC = () => {
                 formulas={formulas}
                 onAdd={handleAddProduct}
                 onEdit={canEdit ? handleEditProduct : undefined}
+                onViewOrders={canEdit ? handleViewOrders : undefined}
                 viewMode={viewMode}
                 isAdmin={canEdit} // Controls seeing FOB, which editors need
             />

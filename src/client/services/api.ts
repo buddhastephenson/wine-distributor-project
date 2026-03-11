@@ -68,6 +68,7 @@ export const productApi = {
 
 export const specialOrderApi = {
     getAll: (username?: string) => api.get<ISpecialOrder[]>('/special-orders', { params: { username } }),
+    getByProductId: (productId: string) => api.get<ISpecialOrder[]>(`/special-orders/product/${productId}`),
     create: (data: Partial<ISpecialOrder>) => api.post<{ success: boolean; order: ISpecialOrder }>('/special-orders', data),
     update: (id: string, updates: Partial<ISpecialOrder>) => api.patch<{ success: boolean; order: ISpecialOrder }>(`/special-orders/${id}`, updates),
     delete: (id: string) => api.delete<{ success: boolean }>(`/special-orders/${id}`),

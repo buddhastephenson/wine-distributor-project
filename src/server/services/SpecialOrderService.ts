@@ -18,6 +18,14 @@ class SpecialOrderService {
         return await SpecialOrder.find(query, '-_id -__v -createdAt -updatedAt').lean();
     }
 
+    async getSpecialOrdersByProductId(productId: string, user?: IUser): Promise<ISpecialOrder[]> {
+        let query: any = { productId };
+        if (user && (user.type === 'admin' || user.type === 'vendor') && user.vendors && user.vendors.length > 0) {
+            query.supplier = { $in: user.vendors };
+        }
+        return await SpecialOrder.find(query, '-_id -__v -updatedAt').sort({ createdAt: -1 }).lean();
+    }
+
     async createSpecialOrder(orderData: Partial<ISpecialOrder>): Promise<ISpecialOrder> {
         // Generate ID if not provided (though model requires it)
         const id = orderData.id || `so-${Date.now()}`;

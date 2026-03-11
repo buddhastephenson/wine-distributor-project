@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, ExternalLink, Pencil } from 'lucide-react';
+import { Plus, ExternalLink, Pencil, ListFilter } from 'lucide-react';
 import { IProduct, IFormulas } from '../../../shared/types';
 import { calculateFrontlinePrice } from '../../utils/formulas';
 
@@ -8,11 +8,12 @@ interface ProductCardProps {
     formulas: IFormulas | null;
     onAdd: (product: IProduct, pricing: any) => void;
     onEdit?: (product: IProduct) => void;
+    onViewOrders?: (product: IProduct) => void;
     isDarkMode?: boolean;
     isAdmin?: boolean;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onAdd, onEdit, isDarkMode, isAdmin }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onAdd, onEdit, onViewOrders, isDarkMode, isAdmin }) => {
     const calc = formulas ? calculateFrontlinePrice(product, formulas) : { frontlinePrice: '0.00', frontlineCase: '0.00', formulaUsed: 'N/A' };
 
     return (
@@ -162,6 +163,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                         <span>Submit Request</span>
                     </button>
 
+                    {isAdmin && onViewOrders && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onViewOrders(product);
+                            }}
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 p-4 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-300 flex items-center justify-center active:scale-[0.98]"
+                            title="View Order History"
+                        >
+                            <ListFilter className="w-5 h-5" />
+                        </button>
+                    )}
+
                     {onEdit && (
                         <button
                             onClick={(e) => {
@@ -171,7 +185,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                             className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 p-4 rounded-2xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-300 flex items-center justify-center active:scale-[0.98]"
                             title="Edit Product"
                         >
-                            <Pencil className="w-4 h-4" />
+                            <Pencil className="w-5 h-5" />
                         </button>
                     )}
                 </div>

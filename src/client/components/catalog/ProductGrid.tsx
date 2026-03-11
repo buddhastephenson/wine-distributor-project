@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, ListFilter } from 'lucide-react';
 import { IProduct, IFormulas } from '../../../shared/types';
 import { ProductCard } from './ProductCard';
 import { calculateFrontlinePrice } from '../../utils/formulas';
@@ -9,12 +9,13 @@ interface ProductGridProps {
     formulas: IFormulas | null;
     onAdd: (product: IProduct, pricing: any) => void;
     onEdit?: (product: IProduct) => void;
+    onViewOrders?: (product: IProduct) => void;
     viewMode: 'grid' | 'list';
     isDarkMode?: boolean;
     isAdmin?: boolean;
 }
 
-export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, onAdd, onEdit, viewMode, isDarkMode, isAdmin }) => {
+export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, onAdd, onEdit, onViewOrders, viewMode, isDarkMode, isAdmin }) => {
     if (viewMode === 'grid') {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
@@ -25,6 +26,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                         formulas={formulas}
                         onAdd={onAdd}
                         onEdit={onEdit}
+                        onViewOrders={onViewOrders}
                         isDarkMode={isDarkMode}
                         isAdmin={isAdmin}
                     />
@@ -103,6 +105,15 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, formulas, on
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>
+                                        {isAdmin && onViewOrders && (
+                                            <button
+                                                onClick={() => onViewOrders(product)}
+                                                className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-sm active:scale-90"
+                                                title="View Order History"
+                                            >
+                                                <ListFilter className="w-4 h-4" />
+                                            </button>
+                                        )}
                                         {isAdmin && onEdit && (
                                             <button
                                                 onClick={() => onEdit(product)}

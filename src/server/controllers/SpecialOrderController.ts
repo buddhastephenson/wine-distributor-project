@@ -20,6 +20,21 @@ class SpecialOrderController {
         }
     }
 
+    async getOrdersByProductId(req: Request, res: Response) {
+        try {
+            const { productId } = req.params;
+            const user = (req as any).user;
+            if (!productId) {
+                return res.status(400).json({ error: 'Product ID is required' });
+            }
+            const orders = await SpecialOrderService.getSpecialOrdersByProductId(productId as string, user);
+            res.json(orders);
+        } catch (error) {
+            console.error('Error fetching orders by product ID:', error);
+            res.status(500).json({ error: 'Failed to fetch product order history' });
+        }
+    }
+
     async createSpecialOrder(req: Request, res: Response) {
         console.log('Received Special Order Request Body:', JSON.stringify(req.body, null, 2));
         try {

@@ -9,6 +9,9 @@ router.use(authenticate);
 // GET /api/special-orders (optional ?username=...)
 router.get('/', SpecialOrderController.getAllSpecialOrders.bind(SpecialOrderController));
 
+// GET /api/special-orders/product/:productId
+router.get('/product/:productId', SpecialOrderController.getOrdersByProductId.bind(SpecialOrderController));
+
 // POST /api/special-orders
 router.post('/', SpecialOrderController.createSpecialOrder.bind(SpecialOrderController));
 
