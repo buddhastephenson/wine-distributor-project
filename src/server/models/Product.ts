@@ -21,10 +21,15 @@ const ProductSchema: Schema = new Schema({
     vendor: { type: String, ref: 'User' },
     lastEditedBy: { type: String },
     lastEditedAt: { type: Date },
-    uploadDate: { type: Date, default: Date.now }
+    uploadDate: { type: Date, default: Date.now },
+    isHidden: { type: Boolean, default: false }
 }, {
     timestamps: true,
     strict: false // Allow other fields if data structure varies (legacy behavior)
 });
+
+// Add a compound unique index to prevent exact duplicates of itemCode per supplier portfolio
+// This acts as a database-level safety net for deduplication
+ProductSchema.index({ itemCode: 1, supplier: 1 }, { unique: true });
 
 export default mongoose.model<IProduct>('Product', ProductSchema);

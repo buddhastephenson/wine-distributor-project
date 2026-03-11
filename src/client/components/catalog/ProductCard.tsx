@@ -22,7 +22,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
                     <span className="text-[10px] font-bold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-3 py-1 rounded-full uppercase tracking-wider">
                         {product.productType || 'Wine'}
                     </span>
-                    <span className="text-[11px] font-mono text-slate-300 dark:text-slate-600">
+                    <span className="text-[12px] font-mono font-bold text-slate-900 dark:text-white">
                         {product.itemCode}
                     </span>
                 </div>
@@ -109,7 +109,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, formulas, onA
 
                     {/* Legacy/Top-Level Dynamic Fields */}
                     {Object.entries(product).map(([key, value]) => {
-                        const standardFields = ['id', 'itemCode', 'producer', 'productName', 'vintage', 'packSize', 'bottleSize', 'productType', 'fobCasePrice', 'productLink', 'supplier', 'uploadDate', 'frontlinePrice', 'frontlineCase', 'srp', 'whlsBottle', 'whlsCase', 'laidIn', 'formulaUsed', 'country', 'region', 'appellation', 'grapeVariety', 'extendedData', 'lastEditedBy', 'lastEditedAt', '_id'];
+                        const standardFields = ['id', 'itemCode', 'producer', 'productName', 'vintage', 'packSize', 'bottleSize', 'productType', 'fobCasePrice', 'productLink', 'supplier', 'vendor', 'uploadDate', 'frontlinePrice', 'frontlineCase', 'srp', 'whlsBottle', 'whlsCase', 'laidIn', 'formulaUsed', 'country', 'region', 'appellation', 'grapeVariety', 'extendedData', 'lastEditedBy', 'lastEditedAt', '_id'];
                         // Also exclude keys that are already in extendedData to prevent duplicates
                         if (standardFields.includes(key) || (product.extendedData && key in product.extendedData) || !value || typeof value === 'object') return null;
                         return (

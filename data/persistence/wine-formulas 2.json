@@ -1,0 +1,23 @@
+{
+    "wine": {
+        "taxPerLiter": 0.32,
+        "taxFixed": 0.15,
+        "shippingPerCase": 13,
+        "marginDivisor": 0.65,
+        "srpMultiplier": 1.47
+    },
+    "spirits": {
+        "taxPerLiter": 1.17,
+        "taxFixed": 0.15,
+        "shippingPerCase": 13,
+        "marginDivisor": 0.65,
+        "srpMultiplier": 1.47
+    },
+    "nonAlcoholic": {
+        "taxPerLiter": 0,
+        "taxFixed": 0,
+        "shippingPerCase": 13,
+        "marginDivisor": 0.65,
+        "srpMultiplier": 1.47
+    }
+}

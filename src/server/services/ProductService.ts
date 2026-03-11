@@ -31,6 +31,9 @@ class ProductService {
 
         // Note: Customers and SuperAdmins (or admins with no vendors assigned) see everything.
 
+        // Global filter: exclude hidden products from the catalog view
+        query.isHidden = { $ne: true };
+
         return await Product.find(query, '-_id -__v -createdAt -updatedAt').lean();
     }
 
@@ -39,9 +42,13 @@ class ProductService {
     }
 
     async updateProduct(id: string, updates: Partial<IProduct>): Promise<IProduct | null> {
+        if (updates.itemCode) updates.itemCode = updates.itemCode.trim();
+        if (updates.supplier) updates.supplier = updates.supplier.trim();
+
         const product = await Product.findOneAndUpdate({ id }, updates, { new: true });
         return product ? product.toObject() : null; // toObject might be needed if strict typing issues, or lean() on query
     }
+
 
     async deleteProduct(id: string): Promise<boolean> {
         const result = await Product.findOneAndDelete({ id });
@@ -49,6 +56,9 @@ class ProductService {
     }
 
     async createProduct(productData: Partial<IProduct>): Promise<IProduct> {
+        if (productData.itemCode) productData.itemCode = productData.itemCode.trim();
+        if (productData.supplier) productData.supplier = productData.supplier.trim();
+
         const newProduct = new Product({
             id: uuidv4(),
             ...productData,
@@ -60,7 +70,11 @@ class ProductService {
 
 
 
+
     async bulkImport(products: IProduct[], supplier: string, vendorId?: string): Promise<{ added: number, updated: number, deleted: number, kept: number, supplier: string }> {
+        // Enforce trim to prevent trailing spaces from creating duplicates
+        supplier = supplier ? supplier.trim() : '';
+
 
         // --- VENDOR ASSOCIATION LOGIC ---
         if (vendorId) {
@@ -113,6 +127,14 @@ class ProductService {
         const keepCodes = Array.from(activeItemCodes).filter((code: any) => !newItemCodes.has(code));
         const protectCodes = [...Array.from(newItemCodes), ...keepCodes];
 
+        // Mark kept products as hidden since they are no longer in the Excel file
+        if (keepCodes.length > 0) {
+            await Product.updateMany({
+                supplier: supplier,
+                itemCode: { $in: keepCodes }
+            }, { $set: { isHidden: true } });
+        }
+
         const deleteResult = await Product.deleteMany({
             supplier: supplier,
             itemCode: { $nin: protectCodes }
@@ -124,14 +146,18 @@ class ProductService {
 
         // Use bulkWrite for efficiency
         const operations = products.map(p => {
+            // Ensure consistent casing/spaces
+            p.itemCode = p.itemCode ? p.itemCode.trim() : '';
+
             // Ensure we don't overwrite existing ID if we are updating
             const { id, ...productData } = p;
+
 
             return {
                 updateOne: {
                     filter: { itemCode: p.itemCode, supplier: supplier }, // Use composite key
                     update: {
-                        $set: { ...productData, uploadDate: new Date() },
+                        $set: { ...productData, uploadDate: new Date(), isHidden: false }, // Explicitly un-hide in case it was previously hidden
                         $setOnInsert: { id: uuidv4() }
                     },
                     upsert: true
