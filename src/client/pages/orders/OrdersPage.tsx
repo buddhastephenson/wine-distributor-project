@@ -3,8 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { OrderList } from '../../components/orders/OrderList';
-import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload, Trash2 } from 'lucide-react';
-import { exportOrdersToExcel } from '../../utils/export';
+import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload, Trash2, FileText } from 'lucide-react';
+import { exportOrdersToExcel, exportOrdersToPDF } from '../../utils/export';
 import { ConfirmationModal } from '../../components/shared/ConfirmationModal';
 import { userApi } from '../../services/api'; // Import userApi
 
@@ -146,6 +146,11 @@ export const OrdersPage: React.FC = () => {
         exportOrdersToExcel(ordersToExport, `AOC_Orders_${new Date().toISOString().split('T')[0]}.xlsx`, vendorMap);
     };
 
+    const handleExportPDF = () => {
+        const ordersToExport = user?.type === 'admin' ? [...pendingOrders, ...submittedOrders] : [...displayedPending, ...displayedSubmitted];
+        exportOrdersToPDF(ordersToExport, `AOC_Special_Orders_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
+
     const handleBulkDelete = () => {
         setIsBulkDeleteModalOpen(true);
     };
@@ -235,6 +240,13 @@ export const OrdersPage: React.FC = () => {
                         >
                             <Download className="w-4 h-4" />
                             <span>Export Excel</span>
+                        </button>
+                        <button
+                            onClick={handleExportPDF}
+                            className="flex items-center space-x-2 bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors shadow-sm"
+                        >
+                            <FileText className="w-4 h-4" />
+                            <span>Export PDF</span>
                         </button>
                     </div>
                 )}

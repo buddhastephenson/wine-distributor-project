@@ -48,6 +48,114 @@ export const exportOrdersToExcel = (orders: ISpecialOrder[], filename: string = 
     XLSX.writeFile(workbook, filename);
 };
 
+export const exportOrdersToPDF = (orders: ISpecialOrder[], filename: string = 'special_orders.pdf', logoUrl: string = '/logo.jpg') => {
+    const doc = new jsPDF('portrait', 'mm', 'letter');
+    const pageWidth = doc.internal.pageSize.width;
+    const headerHeight = 50;
+    const charcoal: [number, number, number] = [89, 89, 89]; // #595959
+
+    const addContent = (logoImage?: HTMLImageElement) => {
+        const drawHeader = (isFirstPage: boolean) => {
+            // Dark charcoal header band
+            doc.setFillColor(...charcoal);
+            doc.rect(0, 0, pageWidth, headerHeight, 'F');
+
+            if (isFirstPage) {
+                if (logoImage) {
+                    const imgWidth = 36;
+                    const imgHeight = (logoImage.height * imgWidth) / logoImage.width;
+                    const logoY = (headerHeight - imgHeight - 8) / 2;
+                    doc.addImage(logoImage, 'JPEG', pageWidth / 2 - imgWidth / 2, logoY, imgWidth, imgHeight);
+                    doc.setFontSize(10);
+                    doc.setTextColor(255, 255, 255);
+                    doc.text('AOC Wine Distributor \u00B7 Special Offers', pageWidth / 2, logoY + imgHeight + 6, { align: 'center' });
+                } else {
+                    doc.setFontSize(16);
+                    doc.setTextColor(255, 255, 255);
+                    doc.text('AOC Wine Distributor', pageWidth / 2, 20, { align: 'center' });
+                    doc.setFontSize(10);
+                    doc.text('Special Offers', pageWidth / 2, 28, { align: 'center' });
+                }
+            } else {
+                doc.setFontSize(10);
+                doc.setTextColor(255, 255, 255);
+                doc.text('AOC Wine Distributor \u00B7 Special Offers', pageWidth / 2, headerHeight / 2 + 3, { align: 'center' });
+            }
+
+            // Reset text color for body
+            doc.setTextColor(0, 0, 0);
+        };
+
+        drawHeader(true);
+
+        const columns = [
+            { header: 'Producer', dataKey: 'producer' },
+            { header: 'Product', dataKey: 'product' },
+            { header: 'Vintage', dataKey: 'vintage' },
+            { header: 'Size', dataKey: 'size' },
+            { header: 'Qty', dataKey: 'qty' },
+            { header: 'Frontline Btl', dataKey: 'frontlineBtl' },
+            { header: 'Frontline Cs', dataKey: 'frontlineCs' },
+            { header: 'Status', dataKey: 'status' },
+        ];
+
+        const rows = orders.map(order => {
+            const frontlineBottle = parseFloat(order.frontlinePrice || '0');
+            const packSize = parseInt(order.packSize || '12');
+            const frontlineCase = frontlineBottle * packSize;
+
+            return {
+                producer: order.producer || '',
+                product: order.productName || '',
+                vintage: order.vintage || '',
+                size: `${order.bottleSize || ''} ${order.packSize ? '/ ' + order.packSize + 'pk' : ''}`.trim(),
+                qty: (order.cases || 0) + (order.bottles ? ` +${order.bottles}btl` : ''),
+                frontlineBtl: frontlineBottle ? `$${frontlineBottle.toFixed(2)}` : '',
+                frontlineCs: frontlineCase ? `$${frontlineCase.toFixed(2)}` : '',
+                status: order.status || 'Pending',
+            };
+        });
+
+        autoTable(doc, {
+            columns,
+            body: rows,
+            startY: headerHeight + 6,
+            headStyles: { fillColor: charcoal, fontSize: 8, fontStyle: 'bold' },
+            bodyStyles: { fontSize: 8 },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+            theme: 'plain',
+            styles: { cellPadding: 3, lineColor: [220, 220, 220], lineWidth: 0.25 },
+            margin: { left: 12, right: 12 },
+            didDrawPage: (data: { pageNumber: number }) => {
+                if (data.pageNumber > 1) {
+                    drawHeader(false);
+                }
+                // Footer
+                doc.setFontSize(7);
+                doc.setTextColor(160, 160, 160);
+                const pageH = doc.internal.pageSize.height;
+                doc.text(`Generated ${new Date().toLocaleDateString()}`, 12, pageH - 8);
+                doc.text(`Page ${data.pageNumber}`, pageWidth - 12, pageH - 8, { align: 'right' });
+                doc.setTextColor(0, 0, 0);
+            },
+        });
+
+        doc.save(filename);
+    };
+
+    if (logoUrl) {
+        const img = new Image();
+        img.src = logoUrl;
+        img.onload = () => addContent(img);
+        img.onerror = () => {
+            console.warn('Could not load logo. Proceeding without it.');
+            addContent();
+        };
+    } else {
+        addContent();
+    }
+};
+
 export const exportProductsToExcel = (data: any[], filename: string = 'products.xlsx') => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
