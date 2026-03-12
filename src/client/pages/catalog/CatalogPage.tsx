@@ -8,11 +8,11 @@ import { ProductEditModal } from '../../components/catalog/ProductEditModal';
 import { ProductOrderHistoryModal } from '../../components/catalog/ProductOrderHistoryModal';
 import { LayoutGrid, List, CheckCircle, Download, Plus, FileText } from 'lucide-react';
 import { calculateFrontlinePrice, parseVolumeToMl } from '../../utils/formulas';
-import { exportProductsToExcel, exportProductsToPDF } from '../../utils/export';
+import { exportProductsToExcel, exportProductsToPDF, exportOrdersToPDF } from '../../utils/export';
 import { IProduct } from '../../../shared/types';
 
 export const CatalogPage: React.FC = () => {
-    const { products, formulas, isLoading, error, fetchProducts, fetchFormulas, addSpecialOrder } = useProductStore();
+    const { products, formulas, isLoading, error, fetchProducts, fetchFormulas, addSpecialOrder, specialOrders, fetchSpecialOrders } = useProductStore();
     const { user, isAuthenticated } = useAuthStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCountry, setSelectedCountry] = useState('all');
@@ -34,6 +34,12 @@ export const CatalogPage: React.FC = () => {
         fetchProducts();
         fetchFormulas();
     }, [fetchProducts, fetchFormulas]);
+
+    useEffect(() => {
+        if (user?.type === 'admin') {
+            fetchSpecialOrders();
+        }
+    }, [user?.type, fetchSpecialOrders]);
 
     // Base Product Set (Filtered by Vendor Role)
     const allowedProducts = useMemo(() => {
@@ -321,6 +327,10 @@ export const CatalogPage: React.FC = () => {
         exportProductsToPDF(exportData, `AOC_Special_Offering_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
+    const handleExportSpecialOrdersPDF = () => {
+        exportOrdersToPDF(specialOrders, `AOC_Special_Orders_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
+
     const handleEditProduct = (product: IProduct) => {
         // Permission Check
         const isAuthorized = user?.type === 'admin' || user?.type === 'vendor';
@@ -442,6 +452,16 @@ export const CatalogPage: React.FC = () => {
                         <FileText className="w-4 h-4" />
                         <span>Export PDF</span>
                     </button>
+
+                    {user?.type === 'admin' && (
+                        <button
+                            onClick={handleExportSpecialOrdersPDF}
+                            className="flex items-center space-x-2 bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors shadow-sm"
+                        >
+                            <FileText className="w-4 h-4" />
+                            <span>Export Special Orders PDF</span>
+                        </button>
+                    )}
 
                     <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
                         <button
