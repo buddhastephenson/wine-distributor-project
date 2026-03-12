@@ -190,66 +190,68 @@ export const OrdersPage: React.FC = () => {
                     </div>
                 </div>
 
-                {user?.type === 'admin' && (
-                    <div className="flex space-x-2">
-                        <label className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm cursor-pointer">
-                            <Upload className="w-4 h-4" />
-                            <span>Import Statuses</span>
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                className="hidden"
-                                onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
+                <div className="flex space-x-2">
+                    {user?.type === 'admin' && (
+                        <>
+                            <label className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors shadow-sm cursor-pointer">
+                                <Upload className="w-4 h-4" />
+                                <span>Import Statuses</span>
+                                <input
+                                    type="file"
+                                    accept=".xlsx, .xls"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
 
-                                    try {
-                                        const { read, utils } = await import('xlsx');
-                                        const data = await file.arrayBuffer();
-                                        const workbook = read(data);
-                                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                                        const jsonData = utils.sheet_to_json(worksheet) as any[];
+                                        try {
+                                            const { read, utils } = await import('xlsx');
+                                            const data = await file.arrayBuffer();
+                                            const workbook = read(data);
+                                            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                                            const jsonData = utils.sheet_to_json(worksheet) as any[];
 
-                                        const updates = jsonData
-                                            .filter((row: any) => row['Order ID'] && row['Status'])
-                                            .map((row: any) => ({
-                                                id: row['Order ID'],
-                                                status: row['Status']
-                                            }));
+                                            const updates = jsonData
+                                                .filter((row: any) => row['Order ID'] && row['Status'])
+                                                .map((row: any) => ({
+                                                    id: row['Order ID'],
+                                                    status: row['Status']
+                                                }));
 
-                                        if (updates.length === 0) {
-                                            alert('No valid rows found. Ensure "Order ID" and "Status" columns exist.');
-                                            return;
+                                            if (updates.length === 0) {
+                                                alert('No valid rows found. Ensure "Order ID" and "Status" columns exist.');
+                                                return;
+                                            }
+
+                                            await useProductStore.getState().batchUpdateStatus(updates);
+                                            setSuccessMessage(`Successfully updated ${updates.length} orders.`);
+                                            // window.location.reload(); // Or just let state update
+                                        } catch (error) {
+                                            console.error('Import Error:', error);
+                                            alert('Failed to import statuses. Check console for details.');
                                         }
-
-                                        await useProductStore.getState().batchUpdateStatus(updates);
-                                        setSuccessMessage(`Successfully updated ${updates.length} orders.`);
-                                        // window.location.reload(); // Or just let state update
-                                    } catch (error) {
-                                        console.error('Import Error:', error);
-                                        alert('Failed to import statuses. Check console for details.');
-                                    }
-                                    // Reset input
-                                    e.target.value = '';
-                                }}
-                            />
-                        </label>
-                        <button
-                            onClick={handleExport}
-                            className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"
-                        >
-                            <Download className="w-4 h-4" />
-                            <span>Export Excel</span>
-                        </button>
-                        <button
-                            onClick={handleExportPDF}
-                            className="flex items-center space-x-2 bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors shadow-sm"
-                        >
-                            <FileText className="w-4 h-4" />
-                            <span>Export PDF</span>
-                        </button>
-                    </div>
-                )}
+                                        // Reset input
+                                        e.target.value = '';
+                                    }}
+                                />
+                            </label>
+                            <button
+                                onClick={handleExport}
+                                className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"
+                            >
+                                <Download className="w-4 h-4" />
+                                <span>Export Excel</span>
+                            </button>
+                        </>
+                    )}
+                    <button
+                        onClick={handleExportPDF}
+                        className="flex items-center space-x-2 bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors shadow-sm"
+                    >
+                        <FileText className="w-4 h-4" />
+                        <span>Export PDF</span>
+                    </button>
+                </div>
             </div>
 
             {successMessage && (
