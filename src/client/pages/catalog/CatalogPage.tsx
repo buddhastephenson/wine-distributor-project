@@ -6,9 +6,9 @@ import { TaxonomySidebar } from '../../components/catalog/TaxonomySidebar';
 import { ProductGrid } from '../../components/catalog/ProductGrid';
 import { ProductEditModal } from '../../components/catalog/ProductEditModal';
 import { ProductOrderHistoryModal } from '../../components/catalog/ProductOrderHistoryModal';
-import { LayoutGrid, List, CheckCircle, Download, Plus } from 'lucide-react';
+import { LayoutGrid, List, CheckCircle, Download, Plus, FileText } from 'lucide-react';
 import { calculateFrontlinePrice, parseVolumeToMl } from '../../utils/formulas';
-import { exportProductsToExcel } from '../../utils/export';
+import { exportProductsToExcel, exportProductsToPDF } from '../../utils/export';
 import { IProduct } from '../../../shared/types';
 
 export const CatalogPage: React.FC = () => {
@@ -299,6 +299,28 @@ export const CatalogPage: React.FC = () => {
         exportProductsToExcel(exportData, `AOC_Catalog_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
+    const handleExportPDF = () => {
+        const exportData = filteredProducts.map(p => {
+            let pricing = {};
+            if (formulas) {
+                pricing = calculateFrontlinePrice(p, formulas);
+            }
+            const combined = { ...p, ...pricing } as any;
+
+            return {
+                'Producer': combined.producer || '',
+                'Product Name': combined.productName || '',
+                'Vintage': combined.vintage || '',
+                'Bottle Size': combined.bottleSize || '',
+                'Pack Size': combined.packSize || '',
+                'Type': combined.productType || '',
+                'Frontline Bottle': combined.frontlinePrice || '',
+                'Frontline Case': combined.frontlineCase || '',
+            };
+        });
+        exportProductsToPDF(exportData, `AOC_Special_Offering_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
+
     const handleEditProduct = (product: IProduct) => {
         // Permission Check
         const isAuthorized = user?.type === 'admin' || user?.type === 'vendor';
@@ -411,6 +433,14 @@ export const CatalogPage: React.FC = () => {
                     >
                         <Download className="w-4 h-4" />
                         <span>Export Excel</span>
+                    </button>
+
+                    <button
+                        onClick={handleExportPDF}
+                        className="flex items-center space-x-2 bg-rose-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-rose-700 transition-colors shadow-sm"
+                    >
+                        <FileText className="w-4 h-4" />
+                        <span>Export PDF</span>
                     </button>
 
                     <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
