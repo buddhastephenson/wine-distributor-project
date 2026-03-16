@@ -42,6 +42,9 @@ class SpecialOrderController {
             res.status(201).json({ success: true, order });
         } catch (error: any) {
             console.error('Create Order Error:', error);
+            if (error.code === 'DUPLICATE_ORDER') {
+                return res.status(409).json({ error: error.message });
+            }
             res.status(500).json({ error: 'Failed to create special order', details: error.message });
         }
     }

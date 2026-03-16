@@ -139,6 +139,7 @@ export const CatalogPage: React.FC = () => {
     }, [allowedProducts, searchTerm, selectedCountry, selectedRegion, selectedAppellation, selectedSupplier, minSize, maxSize, priceRange, formulas]);
 
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const handleAddProduct = async (product: any, pricing: any) => {
         let validItemCode = product.itemCode;
@@ -188,11 +189,21 @@ export const CatalogPage: React.FC = () => {
         };
         console.log('Adding Special Order Payload:', payload);
 
-        const newOrder = await addSpecialOrder(payload);
-        if (newOrder) {
-            navigate('/orders', { state: { highlightOrderId: newOrder.id } });
-        } else {
-            setSuccessMessage(`Added ${validProductName} to your list.`);
+        try {
+            setErrorMessage(null);
+            const newOrder = await addSpecialOrder(payload);
+            if (newOrder) {
+                navigate('/orders', { state: { highlightOrderId: newOrder.id } });
+            } else {
+                setSuccessMessage(`Added ${validProductName} to your list.`);
+                window.scrollTo(0, 0);
+            }
+        } catch (error: any) {
+            if (error.response?.status === 409) {
+                setErrorMessage('Already ordered — this item is already in your active requests.');
+            } else {
+                setErrorMessage('Failed to add item. Please try again.');
+            }
             window.scrollTo(0, 0);
         }
     };
@@ -410,6 +421,13 @@ export const CatalogPage: React.FC = () => {
                         <span className="font-bold text-emerald-800 dark:text-emerald-200">{successMessage}</span>
                     </div>
                     <button onClick={() => setSuccessMessage(null)} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 font-bold text-sm">Dismiss</button>
+                </div>
+            )}
+
+            {errorMessage && (
+                <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/30 rounded-xl p-4 flex items-center justify-between animate-fade-in-up">
+                    <span className="font-bold text-rose-800 dark:text-rose-200">{errorMessage}</span>
+                    <button onClick={() => setErrorMessage(null)} className="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-200 font-bold text-sm">Dismiss</button>
                 </div>
             )}
 

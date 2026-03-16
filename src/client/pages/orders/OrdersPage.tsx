@@ -3,10 +3,11 @@ import { useLocation } from 'react-router-dom';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { OrderList } from '../../components/orders/OrderList';
-import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload, Trash2 } from 'lucide-react';
+import { ClipboardList, CheckCircle, Download, Users, ChevronRight, Upload, Trash2, Send } from 'lucide-react';
 import { exportOrdersToExcel } from '../../utils/export';
 import { ConfirmationModal } from '../../components/shared/ConfirmationModal';
-import { userApi } from '../../services/api'; // Import userApi
+import { userApi } from '../../services/api';
+import { ORDER_STATUS, ISpecialOrder } from '../../../shared/types';
 
 export const OrdersPage: React.FC = () => {
     const { specialOrders, fetchSpecialOrders, updateSpecialOrder, deleteSpecialOrder, bulkDeleteSpecialOrders, isLoading, error } = useProductStore();
@@ -100,6 +101,45 @@ export const OrdersPage: React.FC = () => {
         return submittedOrders.filter(o => (o.username || 'Unknown') === selectedCustomer);
     }, [submittedOrders, selectedCustomer, user?.type]);
 
+    // --- Customer/Rep unified view ---
+    const isCustomerView = user?.type !== 'admin' && user?.type !== 'vendor';
+
+    const allCustomerOrders = useMemo(() => {
+        if (!isCustomerView) return [];
+        return [...specialOrders]
+            .filter(o => o.status !== ORDER_STATUS.DELIVERED)
+            .sort((a, b) => {
+                const dateA = new Date(a.createdAt || a.uploadDate || 0).getTime();
+                const dateB = new Date(b.createdAt || b.uploadDate || 0).getTime();
+                return dateB - dateA;
+            });
+    }, [specialOrders, isCustomerView]);
+
+    const unsubmittedOrders = useMemo(() => {
+        return allCustomerOrders.filter(o => !o.submitted);
+    }, [allCustomerOrders]);
+
+    const STATUS_DISPLAY_ORDER = [
+        ORDER_STATUS.PENDING,
+        ORDER_STATUS.ON_PO,
+        ORDER_STATUS.BOOKED_WITH_SUPPLIER,
+        ORDER_STATUS.BACKORDERED,
+        ORDER_STATUS.NOT_AVAILABLE,
+        ORDER_STATUS.IN_STOCK,
+    ];
+
+    const groupedOrders = useMemo(() => {
+        const groups: Record<string, ISpecialOrder[]> = {};
+        for (const order of allCustomerOrders) {
+            const status = order.status || 'Pending';
+            if (!groups[status]) groups[status] = [];
+            groups[status].push(order);
+        }
+        return STATUS_DISPLAY_ORDER
+            .filter(s => groups[s]?.length > 0)
+            .map(s => ({ status: s, orders: groups[s] }));
+    }, [allCustomerOrders]);
+
     const location = useLocation();
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -124,25 +164,18 @@ export const OrdersPage: React.FC = () => {
     }, [location]);
 
     const handleSubmitRequest = async () => {
-        for (const order of displayedPending) {
+        const ordersToSubmit = isCustomerView ? unsubmittedOrders : displayedPending;
+        for (const order of ordersToSubmit) {
             await updateSpecialOrder(order.id, { submitted: true, status: 'Pending', adminUnseen: true });
         }
         setSuccessMessage('Request Submitted!');
         window.scrollTo(0, 0);
     };
 
-    const handleUpdateRequest = async () => {
-        for (const order of displayedSubmitted) {
-            await updateSpecialOrder(order.id, { adminUnseen: true });
-        }
-        setSuccessMessage('Request Updated! Your rep has been notified of changes.');
-        window.scrollTo(0, 0);
-    };
-
     const handleExport = () => {
         // Export ALL orders (or maybe just the filtered ones? Requirement: "Review Orders box should just be an Excel export of all orders")
         // Assuming "all orders" means everything visible to admin.
-        const ordersToExport = user?.type === 'admin' ? [...pendingOrders, ...submittedOrders] : [...displayedPending, ...displayedSubmitted];
+        const ordersToExport = user?.type === 'admin' ? [...pendingOrders, ...submittedOrders] : allCustomerOrders;
         exportOrdersToExcel(ordersToExport, `AOC_Orders_${new Date().toISOString().split('T')[0]}.xlsx`, vendorMap);
     };
 
@@ -177,7 +210,7 @@ export const OrdersPage: React.FC = () => {
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
                             {user?.type === 'admin'
                                 ? (user.isSuperAdmin ? 'Order Management' : 'Rep Order Management')
-                                : (user?.type === 'vendor' ? 'Vendor Orders' : 'My Wish List')}
+                                : (user?.type === 'vendor' ? 'Vendor Orders' : 'My Orders')}
                         </h2>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
                             {user?.type === 'admin' ? 'Review & Process Requests' : (user?.type === 'vendor' ? 'View orders for your products' : 'Manage your procurement requests')}
@@ -302,77 +335,111 @@ export const OrdersPage: React.FC = () => {
                 )}
 
                 {/* Right Content (Orders) */}
-                <div className={`flex-1 overflow-y-auto ${user?.type === 'admin' ? '' : 'w-full'}`}>
-                    <div className="space-y-8 pb-10">
-                        {/* Pending Requests */}
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-end px-2">
-                                <h3 className={`text-xl font-bold ${(user?.type === 'admin' && displayedPending.some(o => o.adminUnseen)) ||
-                                    (user?.type !== 'admin' && displayedPending.some(o => o.hasUnseenUpdate))
-                                    ? 'text-rose-600 animate-pulse'
-                                    : 'text-slate-800 dark:text-white'
-                                    }`}>
-                                    {user?.type === 'admin' ? `Requests Needed: ${selectedCustomer || ''}` : `My Wish List (${displayedPending.length})`}
-                                </h3>
-                                {displayedPending.length > 0 && user?.type !== 'admin' && (
+                <div className={`flex-1 overflow-y-auto ${user?.type === 'admin' || user?.type === 'vendor' ? '' : 'w-full'}`}>
+                    {isCustomerView ? (
+                        /* ── Customer/Rep: Unified order list grouped by status ── */
+                        <div className="space-y-6 pb-10">
+                            {/* Submit button bar */}
+                            {unsubmittedOrders.length > 0 && (
+                                <div className="flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl px-6 py-4">
+                                    <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+                                        You have {unsubmittedOrders.length} new item{unsubmittedOrders.length > 1 ? 's' : ''} not yet submitted to your rep.
+                                    </p>
                                     <button
                                         onClick={handleSubmitRequest}
                                         className="bg-[#1a1a1a] dark:bg-rose-600 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-slate-800 dark:hover:bg-rose-700 transition-all shadow-lg flex items-center space-x-2"
                                     >
-                                        <CheckCircle className="w-4 h-4" />
+                                        <Send className="w-4 h-4" />
                                         <span>Submit Request</span>
                                     </button>
-                                )}
-                                {user?.type === 'admin' && selectedCustomer && displayedPending.length > 0 && (
-                                    <button
-                                        onClick={handleBulkDelete}
-                                        className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-red-100 transition-colors shadow-sm flex items-center space-x-2 border border-red-200"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        <span>Delete All</span>
-                                    </button>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
-                            {displayedPending.length > 0 ? (
-                                <OrderList
-                                    orders={displayedPending}
-                                    currentUser={user}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                />
+                            {groupedOrders.length > 0 ? (
+                                groupedOrders.map(({ status, orders }) => (
+                                    <div key={status} className="space-y-3">
+                                        <div className="flex items-center gap-3 px-2">
+                                            <span className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+                                                status === ORDER_STATUS.PENDING ? 'bg-slate-50 text-slate-500 border-slate-200' :
+                                                status === ORDER_STATUS.ON_PO ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                                status === ORDER_STATUS.BOOKED_WITH_SUPPLIER ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+                                                status === ORDER_STATUS.BACKORDERED ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                status === ORDER_STATUS.NOT_AVAILABLE ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                status === ORDER_STATUS.IN_STOCK ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                                'bg-gray-50 text-gray-600 border-gray-200'
+                                            }`}>
+                                                {status}
+                                            </span>
+                                            <span className="text-xs font-bold text-slate-400">{orders.length} item{orders.length > 1 ? 's' : ''}</span>
+                                        </div>
+                                        <OrderList
+                                            orders={orders}
+                                            currentUser={user}
+                                            onUpdate={handleUpdate}
+                                            onDelete={handleDelete}
+                                        />
+                                    </div>
+                                ))
                             ) : (
-                                <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                                    <p className="text-slate-400 font-medium">No pending requests.</p>
+                                <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                                    <p className="text-slate-400 font-medium">No orders yet. Add items from the catalog to get started.</p>
                                 </div>
                             )}
                         </div>
-
-                        {/* Submitted History */}
-                        {displayedSubmitted.length > 0 && (
-                            <div className="space-y-6 pt-8 border-t border-slate-100">
+                    ) : (
+                        /* ── Admin/Vendor: Original pending + submitted split ── */
+                        <div className="space-y-8 pb-10">
+                            {/* Pending Requests */}
+                            <div className="space-y-4">
                                 <div className="flex justify-between items-end px-2">
-                                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Request History</h3>
-                                    {user?.type !== 'admin' && (
+                                    <h3 className={`text-xl font-bold ${displayedPending.some(o => o.adminUnseen)
+                                        ? 'text-rose-600 animate-pulse'
+                                        : 'text-slate-800 dark:text-white'
+                                        }`}>
+                                        {`Requests Needed: ${selectedCustomer || ''}`}
+                                    </h3>
+                                    {user?.type === 'admin' && selectedCustomer && displayedPending.length > 0 && (
                                         <button
-                                            onClick={handleUpdateRequest}
-                                            className="bg-[#1a1a1a] dark:bg-rose-600 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-slate-800 dark:hover:bg-rose-700 transition-all shadow-lg flex items-center space-x-2"
+                                            onClick={handleBulkDelete}
+                                            className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-red-100 transition-colors shadow-sm flex items-center space-x-2 border border-red-200"
                                         >
-                                            <CheckCircle className="w-4 h-4" />
-                                            <span>Update Request</span>
+                                            <Trash2 className="w-4 h-4" />
+                                            <span>Delete All</span>
                                         </button>
                                     )}
                                 </div>
-                                <OrderList
-                                    orders={displayedSubmitted}
-                                    currentUser={user}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                    isReadOnly={false}
-                                />
+
+                                {displayedPending.length > 0 ? (
+                                    <OrderList
+                                        orders={displayedPending}
+                                        currentUser={user}
+                                        onUpdate={handleUpdate}
+                                        onDelete={handleDelete}
+                                    />
+                                ) : (
+                                    <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                                        <p className="text-slate-400 font-medium">No pending requests.</p>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+
+                            {/* Submitted History */}
+                            {displayedSubmitted.length > 0 && (
+                                <div className="space-y-6 pt-8 border-t border-slate-100">
+                                    <div className="flex justify-between items-end px-2">
+                                        <h3 className="text-xl font-bold text-slate-800 dark:text-white">Request History</h3>
+                                    </div>
+                                    <OrderList
+                                        orders={displayedSubmitted}
+                                        currentUser={user}
+                                        onUpdate={handleUpdate}
+                                        onDelete={handleDelete}
+                                        isReadOnly={false}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
             <ConfirmationModal

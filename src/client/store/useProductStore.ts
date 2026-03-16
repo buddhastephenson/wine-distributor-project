@@ -83,6 +83,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
             return null;
         } catch (error: any) {
             console.error('Add Special Order Failed:', error.response?.data || error.message);
+            if (error.response?.status === 409) {
+                throw error;
+            }
             set({ error: 'Failed to add to list' });
             return null;
         }

@@ -27,6 +27,21 @@ class SpecialOrderService {
     }
 
     async createSpecialOrder(orderData: Partial<ISpecialOrder>): Promise<ISpecialOrder> {
+        // Duplicate prevention: reject if an active (non-Delivered) order exists
+        // for the same username + productId
+        if (orderData.username && orderData.productId) {
+            const existing = await SpecialOrder.findOne({
+                username: orderData.username,
+                productId: orderData.productId,
+                status: { $ne: 'Delivered' },
+            }).lean();
+            if (existing) {
+                const err: any = new Error('This item is already in your active orders.');
+                err.code = 'DUPLICATE_ORDER';
+                throw err;
+            }
+        }
+
         // Generate ID if not provided (though model requires it)
         const id = orderData.id || `so-${Date.now()}`;
         const newOrder = await SpecialOrder.create({ ...orderData, id });
