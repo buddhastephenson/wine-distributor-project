@@ -57,67 +57,8 @@ export const OrdersPage: React.FC = () => {
         deleteSpecialOrder(id);
     };
 
-    // Separate into "Cart" (Pending Submission) and "History" (Submitted)
-    const pendingOrders = useMemo(() => {
-        return specialOrders.filter(o => !o.submitted).sort((a, b) => {
-            const dateA = new Date(a.createdAt || a.uploadDate || 0).getTime();
-            const dateB = new Date(b.createdAt || b.uploadDate || 0).getTime();
-            return dateB - dateA;
-        });
-    }, [specialOrders]);
-
-    const submittedOrders = useMemo(() => {
-        return specialOrders.filter(o => o.submitted).sort((a, b) => {
-            const dateA = new Date(a.createdAt || a.uploadDate || 0).getTime();
-            const dateB = new Date(b.createdAt || b.uploadDate || 0).getTime();
-            return dateB - dateA;
-        });
-    }, [specialOrders]);
-
     const [searchQuery, setSearchQuery] = useState('');
-
-    // Admin/Vendor: Get Unique Customers
-    const customers = useMemo(() => {
-        if (user?.type !== 'admin' && user?.type !== 'vendor') return [];
-        const allOrders = [...pendingOrders, ...submittedOrders];
-        const unique = Array.from(new Set(allOrders.map(o => o.username || 'Unknown')));
-
-        // Filter by search query
-        const filtered = unique.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()));
-
-        // Sort alphabetically (case-insensitive)
-        return filtered.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-    }, [pendingOrders, submittedOrders, user?.type, searchQuery]);
-
-    const displayedPending = useMemo(() => {
-        if (user?.type === 'customer') return pendingOrders;
-        if (!selectedCustomer) return [];
-        return pendingOrders.filter(o => (o.username || 'Unknown') === selectedCustomer);
-    }, [pendingOrders, selectedCustomer, user?.type]);
-
-    const displayedSubmitted = useMemo(() => {
-        if (user?.type === 'customer') return submittedOrders;
-        if (!selectedCustomer) return [];
-        return submittedOrders.filter(o => (o.username || 'Unknown') === selectedCustomer);
-    }, [submittedOrders, selectedCustomer, user?.type]);
-
-    // --- Customer/Rep unified view ---
     const isCustomerView = user?.type !== 'admin' && user?.type !== 'vendor';
-
-    const allCustomerOrders = useMemo(() => {
-        if (!isCustomerView) return [];
-        return [...specialOrders]
-            .filter(o => o.status !== ORDER_STATUS.DELIVERED)
-            .sort((a, b) => {
-                const dateA = new Date(a.createdAt || a.uploadDate || 0).getTime();
-                const dateB = new Date(b.createdAt || b.uploadDate || 0).getTime();
-                return dateB - dateA;
-            });
-    }, [specialOrders, isCustomerView]);
-
-    const unsubmittedOrders = useMemo(() => {
-        return allCustomerOrders.filter(o => !o.submitted);
-    }, [allCustomerOrders]);
 
     const STATUS_DISPLAY_ORDER = [
         ORDER_STATUS.PENDING,
@@ -128,9 +69,41 @@ export const OrdersPage: React.FC = () => {
         ORDER_STATUS.IN_STOCK,
     ];
 
+    // All active (non-Delivered) orders, sorted by createdAt desc
+    const activeOrders = useMemo(() => {
+        return [...specialOrders]
+            .filter(o => o.status !== ORDER_STATUS.DELIVERED)
+            .sort((a, b) => {
+                const dateA = new Date(a.createdAt || a.uploadDate || 0).getTime();
+                const dateB = new Date(b.createdAt || b.uploadDate || 0).getTime();
+                return dateB - dateA;
+            });
+    }, [specialOrders]);
+
+    // Admin/Vendor: unique customer list from active orders
+    const customers = useMemo(() => {
+        if (user?.type !== 'admin' && user?.type !== 'vendor') return [];
+        const unique = Array.from(new Set(activeOrders.map(o => o.username || 'Unknown')));
+        const filtered = unique.filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()));
+        return filtered.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    }, [activeOrders, user?.type, searchQuery]);
+
+    // Orders to display — for customer it's all their active orders, for admin/vendor it's filtered by selected customer
+    const displayedOrders = useMemo(() => {
+        if (isCustomerView) return activeOrders;
+        if (!selectedCustomer) return [];
+        return activeOrders.filter(o => (o.username || 'Unknown') === selectedCustomer);
+    }, [activeOrders, selectedCustomer, isCustomerView]);
+
+    // Customer-only: unsubmitted orders for the submit button
+    const unsubmittedOrders = useMemo(() => {
+        return displayedOrders.filter(o => !o.submitted);
+    }, [displayedOrders]);
+
+    // Group displayed orders by status
     const groupedOrders = useMemo(() => {
         const groups: Record<string, ISpecialOrder[]> = {};
-        for (const order of allCustomerOrders) {
+        for (const order of displayedOrders) {
             const status = order.status || 'Pending';
             if (!groups[status]) groups[status] = [];
             groups[status].push(order);
@@ -138,7 +111,7 @@ export const OrdersPage: React.FC = () => {
         return STATUS_DISPLAY_ORDER
             .filter(s => groups[s]?.length > 0)
             .map(s => ({ status: s, orders: groups[s] }));
-    }, [allCustomerOrders]);
+    }, [displayedOrders]);
 
     const location = useLocation();
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -164,8 +137,7 @@ export const OrdersPage: React.FC = () => {
     }, [location]);
 
     const handleSubmitRequest = async () => {
-        const ordersToSubmit = isCustomerView ? unsubmittedOrders : displayedPending;
-        for (const order of ordersToSubmit) {
+        for (const order of unsubmittedOrders) {
             await updateSpecialOrder(order.id, { submitted: true, status: 'Pending', adminUnseen: true });
         }
         setSuccessMessage('Request Submitted!');
@@ -175,7 +147,7 @@ export const OrdersPage: React.FC = () => {
     const handleExport = () => {
         // Export ALL orders (or maybe just the filtered ones? Requirement: "Review Orders box should just be an Excel export of all orders")
         // Assuming "all orders" means everything visible to admin.
-        const ordersToExport = user?.type === 'admin' ? [...pendingOrders, ...submittedOrders] : allCustomerOrders;
+        const ordersToExport = activeOrders;
         exportOrdersToExcel(ordersToExport, `AOC_Orders_${new Date().toISOString().split('T')[0]}.xlsx`, vendorMap);
     };
 
@@ -184,7 +156,7 @@ export const OrdersPage: React.FC = () => {
     };
 
     const confirmBulkDelete = async () => {
-        const idsToDelete = displayedPending.map(o => o.id);
+        const idsToDelete = displayedOrders.map(o => o.id);
         await bulkDeleteSpecialOrders(idsToDelete);
         setIsBulkDeleteModalOpen(false);
         setSuccessMessage(`Deleted ${idsToDelete.length} orders.`);
@@ -309,7 +281,7 @@ export const OrdersPage: React.FC = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-1">
                             {customers.map(customer => {
-                                const hasPending = pendingOrders.some(o => (o.username || 'Unknown') === customer);
+                                const hasUnseen = activeOrders.some(o => (o.username || 'Unknown') === customer && o.adminUnseen);
                                 return (
                                     <button
                                         key={customer}
@@ -321,7 +293,7 @@ export const OrdersPage: React.FC = () => {
                                     >
                                         <div className="flex items-center gap-2 truncate">
                                             <span className="truncate">{customer}</span>
-                                            {hasPending && pendingOrders.filter(o => (o.username || 'Unknown') === customer).some(o => o.adminUnseen) && <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>}
+                                            {hasUnseen && <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>}
                                         </div>
                                         {selectedCustomer === customer && <ChevronRight className="w-4 h-4 shrink-0" />}
                                     </button>
@@ -335,111 +307,83 @@ export const OrdersPage: React.FC = () => {
                 )}
 
                 {/* Right Content (Orders) */}
-                <div className={`flex-1 overflow-y-auto ${user?.type === 'admin' || user?.type === 'vendor' ? '' : 'w-full'}`}>
-                    {isCustomerView ? (
-                        /* ── Customer/Rep: Unified order list grouped by status ── */
-                        <div className="space-y-6 pb-10">
-                            {/* Submit button bar */}
-                            {unsubmittedOrders.length > 0 && (
-                                <div className="flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl px-6 py-4">
-                                    <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
-                                        You have {unsubmittedOrders.length} new item{unsubmittedOrders.length > 1 ? 's' : ''} not yet submitted to your rep.
-                                    </p>
+                <div className={`flex-1 overflow-y-auto ${isCustomerView ? 'w-full' : ''}`}>
+                    <div className="space-y-6 pb-10">
+                        {/* Customer submit bar */}
+                        {isCustomerView && unsubmittedOrders.length > 0 && (
+                            <div className="flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl px-6 py-4">
+                                <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+                                    You have {unsubmittedOrders.length} new item{unsubmittedOrders.length > 1 ? 's' : ''} not yet submitted to your rep.
+                                </p>
+                                <button
+                                    onClick={handleSubmitRequest}
+                                    className="bg-[#1a1a1a] dark:bg-rose-600 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-slate-800 dark:hover:bg-rose-700 transition-all shadow-lg flex items-center space-x-2"
+                                >
+                                    <Send className="w-4 h-4" />
+                                    <span>Submit Request</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Admin/Vendor: customer header with delete-all */}
+                        {!isCustomerView && selectedCustomer && (
+                            <div className="flex justify-between items-center px-2">
+                                <h3 className={`text-xl font-bold ${displayedOrders.some(o => o.adminUnseen)
+                                    ? 'text-rose-600 animate-pulse'
+                                    : 'text-slate-800 dark:text-white'
+                                    }`}>
+                                    {selectedCustomer} ({displayedOrders.length})
+                                </h3>
+                                {user?.type === 'admin' && displayedOrders.length > 0 && (
                                     <button
-                                        onClick={handleSubmitRequest}
-                                        className="bg-[#1a1a1a] dark:bg-rose-600 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-slate-800 dark:hover:bg-rose-700 transition-all shadow-lg flex items-center space-x-2"
+                                        onClick={handleBulkDelete}
+                                        className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-red-100 transition-colors shadow-sm flex items-center space-x-2 border border-red-200"
                                     >
-                                        <Send className="w-4 h-4" />
-                                        <span>Submit Request</span>
+                                        <Trash2 className="w-4 h-4" />
+                                        <span>Delete All</span>
                                     </button>
-                                </div>
-                            )}
-
-                            {groupedOrders.length > 0 ? (
-                                groupedOrders.map(({ status, orders }) => (
-                                    <div key={status} className="space-y-3">
-                                        <div className="flex items-center gap-3 px-2">
-                                            <span className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
-                                                status === ORDER_STATUS.PENDING ? 'bg-slate-50 text-slate-500 border-slate-200' :
-                                                status === ORDER_STATUS.ON_PO ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                                                status === ORDER_STATUS.BOOKED_WITH_SUPPLIER ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
-                                                status === ORDER_STATUS.BACKORDERED ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                                status === ORDER_STATUS.NOT_AVAILABLE ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                status === ORDER_STATUS.IN_STOCK ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                                'bg-gray-50 text-gray-600 border-gray-200'
-                                            }`}>
-                                                {status}
-                                            </span>
-                                            <span className="text-xs font-bold text-slate-400">{orders.length} item{orders.length > 1 ? 's' : ''}</span>
-                                        </div>
-                                        <OrderList
-                                            orders={orders}
-                                            currentUser={user}
-                                            onUpdate={handleUpdate}
-                                            onDelete={handleDelete}
-                                        />
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
-                                    <p className="text-slate-400 font-medium">No orders yet. Add items from the catalog to get started.</p>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        /* ── Admin/Vendor: Original pending + submitted split ── */
-                        <div className="space-y-8 pb-10">
-                            {/* Pending Requests */}
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-end px-2">
-                                    <h3 className={`text-xl font-bold ${displayedPending.some(o => o.adminUnseen)
-                                        ? 'text-rose-600 animate-pulse'
-                                        : 'text-slate-800 dark:text-white'
-                                        }`}>
-                                        {`Requests Needed: ${selectedCustomer || ''}`}
-                                    </h3>
-                                    {user?.type === 'admin' && selectedCustomer && displayedPending.length > 0 && (
-                                        <button
-                                            onClick={handleBulkDelete}
-                                            className="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold text-sm uppercase tracking-wider hover:bg-red-100 transition-colors shadow-sm flex items-center space-x-2 border border-red-200"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            <span>Delete All</span>
-                                        </button>
-                                    )}
-                                </div>
-
-                                {displayedPending.length > 0 ? (
-                                    <OrderList
-                                        orders={displayedPending}
-                                        currentUser={user}
-                                        onUpdate={handleUpdate}
-                                        onDelete={handleDelete}
-                                    />
-                                ) : (
-                                    <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                                        <p className="text-slate-400 font-medium">No pending requests.</p>
-                                    </div>
                                 )}
                             </div>
+                        )}
 
-                            {/* Submitted History */}
-                            {displayedSubmitted.length > 0 && (
-                                <div className="space-y-6 pt-8 border-t border-slate-100">
-                                    <div className="flex justify-between items-end px-2">
-                                        <h3 className="text-xl font-bold text-slate-800 dark:text-white">Request History</h3>
+                        {/* Grouped orders by status */}
+                        {groupedOrders.length > 0 ? (
+                            groupedOrders.map(({ status, orders }) => (
+                                <div key={status} className="space-y-3">
+                                    <div className="flex items-center gap-3 px-2">
+                                        <span className={`text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+                                            status === ORDER_STATUS.PENDING ? 'bg-slate-50 text-slate-500 border-slate-200' :
+                                            status === ORDER_STATUS.ON_PO ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                            status === ORDER_STATUS.BOOKED_WITH_SUPPLIER ? 'bg-indigo-50 text-indigo-600 border-indigo-200' :
+                                            status === ORDER_STATUS.BACKORDERED ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                            status === ORDER_STATUS.NOT_AVAILABLE ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                            status === ORDER_STATUS.IN_STOCK ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                            'bg-gray-50 text-gray-600 border-gray-200'
+                                        }`}>
+                                            {status}
+                                        </span>
+                                        <span className="text-xs font-bold text-slate-400">{orders.length} item{orders.length > 1 ? 's' : ''}</span>
                                     </div>
                                     <OrderList
-                                        orders={displayedSubmitted}
+                                        orders={orders}
                                         currentUser={user}
                                         onUpdate={handleUpdate}
                                         onDelete={handleDelete}
-                                        isReadOnly={false}
                                     />
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            ))
+                        ) : (
+                            <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700">
+                                <p className="text-slate-400 font-medium">
+                                    {isCustomerView
+                                        ? 'No orders yet. Add items from the catalog to get started.'
+                                        : selectedCustomer
+                                            ? 'No active orders for this customer.'
+                                            : 'Select a customer to view their orders.'}
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
             <ConfirmationModal
@@ -447,7 +391,7 @@ export const OrdersPage: React.FC = () => {
                 onClose={() => setIsBulkDeleteModalOpen(false)}
                 onConfirm={confirmBulkDelete}
                 title="Delete All Pending Requests?"
-                message={`Are you sure you want to delete all ${displayedPending.length} pending requests for ${selectedCustomer}? This action cannot be undone.`}
+                message={`Are you sure you want to delete all ${displayedOrders.length} orders for ${selectedCustomer}? This action cannot be undone.`}
                 confirmLabel="Delete All"
                 variant="danger"
             />
